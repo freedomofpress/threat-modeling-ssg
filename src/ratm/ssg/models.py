@@ -34,7 +34,6 @@ class ThreatMapping(BaseModel):
 
 
 class Threat(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
     SID: str
     comment: str = ""
     description: str = ""
