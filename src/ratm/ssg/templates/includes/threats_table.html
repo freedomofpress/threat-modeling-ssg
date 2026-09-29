@@ -1,9 +1,10 @@
-{% for group in severity_tables %}
+{% import "includes/macros.html" as m %}
+{% for group in impact_tables %}
 <div class="prop-table-wrap">
 <table class="prop-table">
     <thead>
         <tr>
-            <th class="prop-sticky prop-section-cell">{{ group.severity }}</th>
+            <th class="prop-sticky prop-section-cell">{{ group.impact }} impact</th>
             {% for prop in group.props %}
             <th class="prop-col" style="z-index: {{ loop.revindex }}">
                 <div>
@@ -20,20 +21,13 @@
             <td class="prop-sticky{% if is_active %} prop-sticky--active{% endif %}" title="{{ threat_id }}: {{ threat.description }}">
                 <a href="threat_{{ threat_id }}.html">{{ threat_id }}</a>
                 <div class="prop-meta">{{ threat.description | truncate(40) }}</div>
+                <div class="prop-meta">{{ m.status_badge(threat.status) }} <span class="risk-score" title="risk = impact × likelihood">risk {{ m.risk(threat) }}</span></div>
             </td>
             {% for prop in group.props %}
             {% set req_tokens = threat.mapping.requirements_for_prop(prop) %}
-            {% set mit_tokens = threat.mapping.mitigations_for_prop(prop) %}
-            {% set is_req = req_tokens | length > 0 %}
-            {% set is_mit = mit_tokens | length > 0 %}
-            {% set req_dotted = is_req and prop not in threat.mapping.requirements %}
-            {% set mit_dotted = is_mit and prop not in threat.mapping.mitigations %}
-            {% if is_req and is_mit %}
-            <td class="prop-cell prop-req" data-tooltip="{{ threat_id }} · {{ req_tokens | join(', ') }} (req) · {{ mit_tokens | join(', ') }} (mit)">R{% if req_dotted %}*{% endif %}/M{% if mit_dotted %}*{% endif %}</td>
-            {% elif is_req %}
+            {% if req_tokens %}
+            {% set req_dotted = prop not in threat.mapping.requirements %}
             <td class="prop-cell prop-req" data-tooltip="{{ threat_id }} · {{ req_tokens | join(', ') }} = requirement">R{% if req_dotted %}*{% endif %}</td>
-            {% elif is_mit %}
-            <td class="prop-cell prop-mit" data-tooltip="{{ threat_id }} · {{ mit_tokens | join(', ') }} = mitigation">M{% if mit_dotted %}*{% endif %}</td>
             {% else %}
             <td class="prop-cell prop-false"></td>
             {% endif %}

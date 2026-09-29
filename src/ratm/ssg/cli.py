@@ -8,7 +8,15 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from . import views  # noqa: F401 — registers @view decorators
 from .models import SiteConfig, ThreatModel
-from .utils import display_token, property_href, render_views, slugify
+from .utils import (
+    display_token,
+    mitigation_href,
+    property_href,
+    render_views,
+    slugify,
+    status_slug,
+    threat_actor_href,
+)
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -41,6 +49,9 @@ def build_env() -> Environment:
     env.filters["slugify"] = slugify
     env.filters["display"] = display_token
     env.filters["property_href"] = property_href
+    env.filters["mitigation_href"] = mitigation_href
+    env.filters["threat_actor_href"] = threat_actor_href
+    env.filters["status_slug"] = status_slug
 
     # FIXME: These are a bit hackish, but work.
     env.filters["sort_by_class"] = lambda d: sorted(

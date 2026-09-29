@@ -823,7 +823,7 @@ a.count-box:hover {
 .count-box--orange, .count-box--high                         { background: var(--color-count-orange); box-shadow: 0 0 10px var(--color-count-orange-glow); }
 .count-box--blue, .count-box--medium                         { background: var(--color-count-blue);   box-shadow: 0 0 10px var(--color-count-blue-glow); }
 .count-box--teal, .count-box--low                            { background: var(--color-count-teal);   box-shadow: 0 0 10px var(--color-count-teal-glow); }
-.count-box--grey                                             { background: var(--color-count-grey);   box-shadow: 0 0 10px var(--color-count-grey-glow); }
+.count-box--grey, .count-box--unknown                        { background: var(--color-count-grey);   box-shadow: 0 0 10px var(--color-count-grey-glow); }
 
 .count-box--red:hover    { box-shadow: 0 8px 20px var(--color-count-red-glow); }
 .count-box--orange:hover { box-shadow: 0 8px 20px var(--color-count-orange-glow); }
@@ -903,4 +903,41 @@ svg a {
 
     text { text-decoration: none; }
     &:hover text { text-decoration: underline; }
+}
+
+/* Threat and mitigation statuses. The same modifier colors a badge, a
+   summary count box or a matrix cell. */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    vertical-align: middle;
+    color: var(--color-text);
+    background-color: var(--color-count-grey);
+}
+
+.status--unmanaged, .status--proposed              { background-color: var(--color-count-red); }
+.status--partially-mitigated                       { background-color: var(--color-count-orange); }
+.status--accepted, .status--transferred,
+.status--inform, .status--optional                 { background-color: var(--color-count-blue); }
+.status--mitigated, .status--avoided,
+.status--implemented                               { background-color: var(--color-count-teal); }
+.status--out-of-scope                              { background-color: var(--color-count-grey); }
+.status--test                                      { background-color: var(--color-prop-true); }
+
+.count-box.status--unmanaged           { box-shadow: 0 0 10px var(--color-count-red-glow); }
+.count-box.status--partially-mitigated { box-shadow: 0 0 10px var(--color-count-orange-glow); }
+.count-box.status--accepted, .count-box.status--transferred,
+.count-box.status--inform              { box-shadow: 0 0 10px var(--color-count-blue-glow); }
+.count-box.status--mitigated, .count-box.status--avoided
+                                       { box-shadow: 0 0 10px var(--color-count-teal-glow); }
+.count-box.status--out-of-scope        { box-shadow: 0 0 10px var(--color-count-grey-glow); }
+
+.risk-score {
+    font-family: var(--font-mono, monospace);
+    color: var(--color-7);
 }

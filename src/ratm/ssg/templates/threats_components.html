@@ -2,13 +2,17 @@
 {% set active_page = "threats_components.html" %}
 {% block title %}Threats × Components - Threat Model{% endblock %}
 
-{% macro mitigation_tags(satisfied, missing) %}
-{% if not satisfied and not missing %}
+{% import "includes/macros.html" as m %}
+
+{% macro mitigation_tags(mitigations, states) %}
+{% if not mitigations %}
 <span class="cell-tip__none">No mitigation exists for this threat.</span>
 {% else %}
 <span class="cell-tip__tags">
-    {% for tok in satisfied %}<span class="tag tag--true">{{ tok | display }}</span>{% endfor %}
-    {% for tok in missing %}<span class="tag tag--false">{{ tok | display }}</span>{% endfor %}
+    {% for mit in mitigations %}
+    {% set st = states | selectattr("mitigation.id", "equalto", mit.id) | first %}
+    <span class="tag {{ 'tag--true' if st and st.implemented else ('tag--false' if st else 'tag--text') }}">{{ mit.id }}</span>
+    {% endfor %}
 </span>
 {% endif %}
 {% endmacro %}
@@ -30,8 +34,8 @@
                 </div>
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
-                    <span class="cell-tip__meta">Severity: {{ threat.severity or "Unknown" }}</span>
-                    {{ mitigation_tags([], threat.mapping.mitigations) }}
+                    <span class="cell-tip__meta">Impact: {{ threat.impact_label }} · Likelihood: {{ threat.likelihood_label }} · Risk: {{ m.risk(threat) }} · {{ threat.status }}</span>
+                    {{ mitigation_tags(model.threat_mitigations(threat), []) }}
                 </span>
             </th>
             {% endfor %}
@@ -54,12 +58,12 @@
             {% for tid, threat in active_threats %}
             {% set cell = status[tid].get(comp_name) %}
             {% if cell %}
-            <td class="prop-cell {{ 'prop-mit' if cell.mitigated else 'prop-req' }}">
-                {{ '✓' if cell.mitigated else '✗' }}
+            <td class="prop-cell status--{{ threat.status | status_slug }}">
+                &bull;
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
-                    <span class="cell-tip__meta">{{ comp_name }} — {{ 'mitigated' if cell.mitigated else 'not mitigated' }}</span>
-                    {{ mitigation_tags(cell.satisfied, cell.missing) }}
+                    <span class="cell-tip__meta">{{ comp_name }} — {{ threat.status }} · risk {{ m.risk(threat) }}</span>
+                    {{ mitigation_tags(model.threat_mitigations(threat), cell.states) }}
                 </span>
             </td>
             {% else %}

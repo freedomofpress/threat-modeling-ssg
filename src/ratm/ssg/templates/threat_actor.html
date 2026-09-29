@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% import "includes/macros.html" as m %}
+{% set active_page = "threat_actors.html" %}
+{% block title %}{{ actor.name }} - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Threat actor: {{ actor.name }}</h1>
+
+{% if actor.description %}<p>{{ actor.description }}</p>{% endif %}
+
+<h2>Threats</h2>
+{% if threats %}
+<table>
+    <thead>
+        <tr>
+            <th>Threat ID</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Impact</th>
+            <th>Likelihood</th>
+            <th>Risk</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tid, threat in threats %}
+        <tr>
+            <td><a href="threat_{{ tid }}.html">{{ tid }}</a></td>
+            <td>{{ threat.description }}</td>
+            <td>{{ m.status_badge(threat.status) }}</td>
+            <td>{{ threat.impact_label }}</td>
+            <td>{{ threat.likelihood_label }}</td>
+            <td>{{ m.risk(threat) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No threats attributed to this actor.</em></p>
+{% endif %}
+
+<p><a href="threat_actors.html">Back to Threat Actors</a> | <a href="index.html">Back to Summary</a></p>
+{% endblock %}

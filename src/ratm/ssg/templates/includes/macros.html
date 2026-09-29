@@ -1,0 +1,22 @@
+{% macro status_badge(status) -%}
+<span class="status-badge status--{{ status | status_slug }}">{{ status }}</span>
+{%- endmacro %}
+
+{% macro mitigation_status(mitigation) -%}
+<span class="status-badge status--{{ mitigation.status }}">{{ mitigation.status }}</span>
+
+{%- endmacro %}
+
+{% macro mitigation_link(mitigation) -%}
+<a href="{{ mitigation.id | mitigation_href }}">{{ mitigation.id }}</a>
+{%- endmacro %}
+
+{% macro implemented_mark(implemented) -%}
+{% if implemented is sameas true %}<span class="tag tag--true">implemented</span>
+{%- elif implemented is sameas false %}<span class="tag tag--false">missing</span>
+{%- endif %}
+{%- endmacro %}
+
+{% macro risk(threat) -%}
+{{ threat.risk_score if threat.risk_score is not none else "?" }}
+{%- endmacro %}
