@@ -1,6 +1,8 @@
 """End-to-end: author a model, generate the report, load it, and render every view."""
 
+import html
 import json
+import re
 import runpy
 from pathlib import Path
 
@@ -144,6 +146,61 @@ def test_summary_and_matrix(tmp_path: Path) -> None:
     assert "M-SANITIZE: missing" in matrix
     prop = (tmp_path / "property_sanitizes_input.html").read_text()
     assert "Worker" in prop and "mitigation_M-SANITIZE.html" in prop
+
+
+def diagram_sources(page: str) -> list[str]:
+    """The diagram text as diagrams.js reads it: the decoded textContent."""
+    return [
+        html.unescape(raw)
+        for raw in re.findall(
+            r'<pre class="diagram-source" hidden>(.*?)</pre>', page, re.DOTALL
+        )
+    ]
+
+
+def test_model_text_is_escaped(tmp_path: Path) -> None:
+    report = author_model()
+    tricky = 'Use "safe" <b>parser</b> & friends'
+    threat = next(t for t in report["threats"] if t["SID"] == "T-INPUT")
+    threat["description"] = tricky
+    report["mitigations"]["M-SANITIZE"]["title"] = tricky
+    model = render(report, tmp_path)
+
+    escaped = "Use &#34;safe&#34; &lt;b&gt;parser&lt;/b&gt; &amp; friends"
+    for name in (
+        "threat_T-INPUT.html",
+        "threats.html",
+        "scenario_Handle_request.html",
+        "mitigation_M-SANITIZE.html",
+        "mitigations.html",
+        "component_Web_app.html",
+    ):
+        assert escaped in (tmp_path / name).read_text(), name
+    # Inside an attribute, from a macro, and from an include.
+    assert f'title="{escaped}"' in (tmp_path / "component_Web_app.html").read_text()
+    assert (
+        f'title="{escaped}"' in (tmp_path / "scenario_Handle_request.html").read_text()
+    )
+
+    for page_path in tmp_path.glob("*.html"):
+        page = page_path.read_text()
+        assert "<b>" not in page, page_path.name
+        # Double escaping, or macro output escaped as text.
+        for needle in ("&amp;amp;", "&amp;#34;", "&lt;span", "&lt;a "):
+            assert needle not in page, (page_path.name, needle)
+
+    # In the page, the diagram source is escaped. Decoding it must give back exactly the
+    # DOT and Mermaid text, since that is what diagrams.js passes to Viz and Mermaid.
+    scenario = model.scenarios[0]
+    page = (tmp_path / "scenario_Handle_request.html").read_text()
+    assert "label = &lt;&lt;i&gt;Net&lt;/i&gt;&gt;;" in page
+    assert diagram_sources(page) == [scenario.dfd, scenario.mermaid]
+    assert "label = <<i>Net</i>>;" in scenario.dfd
+    for name in ("index.html", "scenarios.html", "threat_T-INPUT.html"):
+        sources = diagram_sources((tmp_path / name).read_text())
+        assert sources, name
+        assert all(s.startswith(("digraph tm {", "sequenceDiagram")) for s in sources)
+        assert any("label = <<i>Net</i>>;" in s for s in sources), name
 
 
 @pytest.mark.skipif(not DEMO.exists(), reason="demo model missing")
