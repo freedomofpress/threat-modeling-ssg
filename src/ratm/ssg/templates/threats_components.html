@@ -21,6 +21,10 @@
 <h1>Threats × Components</h1>
 
 {% if active_threats and sorted_components %}
+<div class="status-legend">
+    A cell means the threat applies to the component. Its color is the threat's status:
+    {% for status in status_legend %}{{ m.status_badge(status) }}{% endfor %}
+</div>
 {% set col_span = active_threats | length + 1 %}
 <div class="prop-table-wrap">
 <table class="prop-table" id="tc-table">
@@ -59,7 +63,7 @@
             {% set cell = status[tid].get(comp_name) %}
             {% if cell %}
             <td class="prop-cell status--{{ threat.status | status_slug }}">
-                &bull;
+                &#x25CF;
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
                     <span class="cell-tip__meta">{{ comp_name }} — {{ threat.status }} · risk {{ m.risk(threat) }}</span>

@@ -55,6 +55,15 @@
     --color-count-blue-glow:  rgba( 84,  78, 104, 0.4);
     --color-count-teal-glow:  rgba( 32,  60,  86, 0.4);
     --color-count-grey-glow:  rgba( 13,  43,  69, 0.4);
+    /* Statuses: "done" and "none" need their own text color to stay readable
+       against the container in both themes. */
+    --color-status-open:      var(--color-count-red);
+    --color-status-partial:   var(--color-count-orange);
+    --color-status-managed:   var(--color-count-blue);
+    --color-status-done:      var(--color-6);
+    --color-status-done-text: var(--color-1);
+    --color-status-none:      var(--color-1);
+    --color-status-none-text: var(--color-7);
 
     /* Layout */
     --table-col-width:    36px;
@@ -97,6 +106,10 @@
     --color-count-blue-glow:  rgba( 84,  78, 104, 0.35);
     --color-count-teal-glow:  rgba( 32,  60,  86, 0.35);
     --color-count-grey-glow:  rgba( 13,  43,  69, 0.35);
+    --color-status-done:      var(--color-2);
+    --color-status-done-text: var(--color-8);
+    --color-status-none:      var(--color-7);
+    --color-status-none-text: var(--color-3);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -920,13 +933,13 @@ svg a {
     background-color: var(--color-count-grey);
 }
 
-.status--unmanaged, .status--proposed              { background-color: var(--color-count-red); }
-.status--partially-mitigated                       { background-color: var(--color-count-orange); }
+.status--unmanaged, .status--proposed              { background-color: var(--color-status-open); }
+.status--partially-mitigated                       { background-color: var(--color-status-partial); }
 .status--accepted, .status--transferred,
-.status--inform, .status--optional                 { background-color: var(--color-count-blue); }
+.status--inform, .status--optional                 { background-color: var(--color-status-managed); }
 .status--mitigated, .status--avoided,
-.status--implemented                               { background-color: var(--color-count-teal); }
-.status--out-of-scope                              { background-color: var(--color-count-grey); }
+.status--implemented                               { background-color: var(--color-status-done); color: var(--color-status-done-text); }
+.status--out-of-scope                              { background-color: var(--color-status-none); color: var(--color-status-none-text); }
 .status--test                                      { background-color: var(--color-prop-true); }
 
 .count-box.status--unmanaged           { box-shadow: 0 0 10px var(--color-count-red-glow); }
@@ -934,10 +947,33 @@ svg a {
 .count-box.status--accepted, .count-box.status--transferred,
 .count-box.status--inform              { box-shadow: 0 0 10px var(--color-count-blue-glow); }
 .count-box.status--mitigated, .count-box.status--avoided
-                                       { box-shadow: 0 0 10px var(--color-count-teal-glow); }
+                                       { box-shadow: 0 0 10px var(--color-count-orange-glow); }
 .count-box.status--out-of-scope        { box-shadow: 0 0 10px var(--color-count-grey-glow); }
+.count-box.status--mitigated .count-box__value, .count-box.status--mitigated .count-box__label,
+.count-box.status--avoided .count-box__value,   .count-box.status--avoided .count-box__label
+                                       { color: var(--color-status-done-text); }
+.count-box.status--out-of-scope .count-box__value, .count-box.status--out-of-scope .count-box__label
+                                       { color: var(--color-status-none-text); }
 
 .risk-score {
     font-family: var(--font-mono, monospace);
     color: var(--color-7);
+}
+
+/* A matrix cell means "this threat applies here". Keep the marker legible
+   whatever the status background, which can match the empty-cell color. */
+td.prop-cell[class*="status--"] {
+    color: var(--color-text);
+    font-weight: bold;
+    text-shadow: var(--color-glow);
+}
+
+.status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 10px 0 20px;
+    color: var(--color-text-dim);
+    font-size: 0.9em;
 }
