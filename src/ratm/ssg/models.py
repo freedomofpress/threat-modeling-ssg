@@ -375,7 +375,10 @@ class ThreatModel(BaseModel):
             threat = self.threats.get(tid)
             if not threat:
                 continue
-            for mit in self.threat_mitigations(threat):
+            candidates = self.threat_mitigations(threat) + self.threat_mitigations(
+                threat, further=True
+            )
+            for mit in candidates:
                 if mit.implemented_on(component) is False:
                     potential[mit.id] = mit
         return [potential[mid] for mid in sorted(potential)]
@@ -383,8 +386,9 @@ class ThreatModel(BaseModel):
     def property_mitigation_state(self, prop_key: str) -> list[dict[str, Any]]:
         """Describe each mitigation whose `property` uses prop_key.
 
-        Each entry lists the threats that name the mitigation and appear in a scenario,
-        and the affected components that have or lack the property.
+        Each entry lists the threats that appear in a scenario and name the mitigation,
+        either as in place or as a further mitigation, and the components those threats
+        affect that have or lack the property.
         """
         analysis = self.analyze()
         states = []
@@ -392,18 +396,16 @@ class ThreatModel(BaseModel):
             mit = self.mitigations[mid]
             if not mit.refers_to_prop(prop_key):
                 continue
-            threats = [
+            active = [
                 (tid, self.threats[tid])
-                for tid in analysis["threat_counter"]
-                if tid in self.threats and mid in self.threats[tid].mapping.mitigations
+                for tid in sorted(analysis["threat_counter"])
+                if tid in self.threats
             ]
-            affected = sorted(
-                {
-                    name
-                    for tid, _ in threats
-                    for name in analysis["threats_to_components"].get(tid, set())
-                }
-            )
+            threats = [(tid, t) for tid, t in active if mid in t.mapping.mitigations]
+            proposed_for = [
+                (tid, t) for tid, t in active if mid in t.mapping.further_mitigations
+            ]
+            affected = self.affected_components(threats + proposed_for)
             implemented_on, missing_on = [], []
             for name in affected:
                 comp = self.components.get(name)
@@ -412,16 +414,27 @@ class ThreatModel(BaseModel):
                 (implemented_on if mit.implemented_on(comp) else missing_on).append(
                     (name, comp)
                 )
-            threats.sort(key=lambda item: item[0])
             states.append(
                 {
                     "mitigation": mit,
                     "threats": threats,
+                    "proposed_for": proposed_for,
                     "implemented_on": implemented_on,
                     "missing_on": missing_on,
                 }
             )
         return states
+
+    def affected_components(self, threats: list[tuple[str, Threat]]) -> list[str]:
+        """Return the sorted names of the components any of these threats affect."""
+        analysis = self.analyze()
+        return sorted(
+            {
+                name
+                for tid, _ in threats
+                for name in analysis["threats_to_components"].get(tid, set())
+            }
+        )
 
     def parent_threats(self, threat_id: str) -> list[str]:
         """Return the ids of the threats that list threat_id as a child."""

@@ -492,3 +492,41 @@ def test_entity_lists_are_keyed() -> None:
     assert list(model.threats) == ["T1"]
     assert list(model.mitigations) == ["M1"]
     assert list(model.threat_actors) == ["Any"]
+
+
+def test_further_mitigations_count_per_component(model_factory) -> None:
+    """A mitigation proposed for a threat still shows which components lack it."""
+    encrypt = Mitigation(
+        id="M-ENCRYPT", title="Encrypt", property="encrypts_secrets", status="proposed"
+    )
+    model = model_factory(
+        threats={
+            "T1": Threat(
+                SID="T1",
+                mapping=ThreatMapping(
+                    requirements=["stores_secrets"],
+                    further_mitigations=["M-ENCRYPT"],
+                ),
+            ),
+        },
+        components={
+            "A": Component(
+                name="A", component_class="Process", properties={"stores_secrets": True}
+            ),
+            "B": Component(name="B", component_class="Process"),
+        },
+        scenarios=[
+            Scenario(
+                name="S1",
+                findings=[Finding(target="A", threat_id="T1")],
+                flows=[FLOW_A_B],
+            )
+        ],
+        mitigations={"M-ENCRYPT": encrypt},
+    )
+    (state,) = model.property_mitigation_state("encrypts_secrets")
+    assert state["threats"] == []
+    assert [tid for tid, _ in state["proposed_for"]] == ["T1"]
+    assert [name for name, _ in state["missing_on"]] == ["A"]
+    potential = model.component_potential_mitigations(model.components["A"], {"T1"})
+    assert [m.id for m in potential] == ["M-ENCRYPT"]

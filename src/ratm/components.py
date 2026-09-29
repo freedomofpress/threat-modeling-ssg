@@ -332,7 +332,9 @@ class Threat:
     def likelihood_label(self):
         if self.likelihood:
             return self.likelihood
-        if self.capec_info and self.capec_info.likelihood:
+        # CAPEC also uses values off this scale, such as "Unknown". Treat those as not
+        # given rather than failing the author's build over CAPEC data.
+        if self.capec_info and self.capec_info.likelihood in scales.LIKELIHOOD_SCORES:
             return self.capec_info.likelihood
         return None
 

@@ -157,3 +157,12 @@ def test_demo_round_trip(tmp_path: Path) -> None:
     model = render(report, tmp_path)
     assert (tmp_path / "mitigations.html").exists()
     assert model.analyze()["status_distribution"]
+
+
+def test_proposed_mitigation_page_lists_components(tmp_path: Path) -> None:
+    report = author_model()
+    report["mitigations"]["M-WAF"]["property"] = "sanitizes_input"
+    render(report, tmp_path)
+    page = (tmp_path / "mitigation_M-WAF.html").read_text()
+    assert "No affected components." not in page
+    assert "component_Worker.html" in page

@@ -341,18 +341,11 @@ def mitigation_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> Iterable[dict[str, Any]]:
-    analysis = model.analyze()
     for mid, mitigation in model.mitigations.items():
         mitigating, proposing = model.mitigation_threats(mid)
         component_states = None
         if mitigation.property:
-            affected = sorted(
-                {
-                    name
-                    for tid, _ in mitigating
-                    for name in analysis["threats_to_components"].get(tid, set())
-                }
-            )
+            affected = model.affected_components(mitigating + proposing)
             component_states = [
                 (
                     name,

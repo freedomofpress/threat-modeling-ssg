@@ -12,13 +12,24 @@
 {% for state in data.mitigation_states %}
 <h3>{{ m.mitigation_link(state.mitigation) }} · {{ state.mitigation.title }} {{ m.mitigation_status(state.mitigation) }}</h3>
 {% if state.mitigation.property != prop %}<p><code class="prop-token">{{ state.mitigation.property }}</code></p>{% endif %}
+{% if state.threats or state.proposed_for %}
+{% if state.threats %}
 <p>Threats it mitigates:
     {% for tid, threat in state.threats %}
     <a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}
-    {% else %}
-    <em>none found in any scenario</em>
     {% endfor %}
 </p>
+{% endif %}
+{% if state.proposed_for %}
+<p>Possible further mitigation for:
+    {% for tid, threat in state.proposed_for %}
+    <a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}
+    {% endfor %}
+</p>
+{% endif %}
+{% else %}
+<p><em>No threat found in any scenario lists this mitigation.</em></p>
+{% endif %}
 <ul class="prop-list">
     {% for name, comp in state.implemented_on %}
     <li>
