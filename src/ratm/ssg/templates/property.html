@@ -7,16 +7,16 @@
 {% block content %}
 <h1>Property: {{ display_label }}</h1>
 
-<h2>Mitigations tracked by this property</h2>
+<h2>Mitigations checked with this property</h2>
 {% if data.mitigation_states %}
 {% for state in data.mitigation_states %}
 <h3>{{ m.mitigation_link(state.mitigation) }} · {{ state.mitigation.title }} {{ m.mitigation_status(state.mitigation) }}</h3>
 {% if state.mitigation.property != prop %}<p><code class="prop-token">{{ state.mitigation.property }}</code></p>{% endif %}
-<p>Mitigates:
+<p>Threats it mitigates:
     {% for tid, threat in state.threats %}
     <a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}
     {% else %}
-    <em>no active threats</em>
+    <em>none found in any scenario</em>
     {% endfor %}
 </p>
 <ul class="prop-list">
@@ -24,7 +24,7 @@
     <li>
         <a href="component_{{ name | slugify }}.html">{{ name }}</a>
         <span class="prop-meta">{{ comp.component_class }}{% if comp.inBoundary %} · {{ comp.inBoundary }}{% endif %}</span>
-        <span class="badge badge-true">implemented</span>
+        <span class="badge badge-true">in place</span>
     </li>
     {% endfor %}
     {% for name, comp in state.missing_on %}

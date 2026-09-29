@@ -55,8 +55,10 @@
     --color-count-blue-glow:  rgba( 84,  78, 104, 0.4);
     --color-count-teal-glow:  rgba( 32,  60,  86, 0.4);
     --color-count-grey-glow:  rgba( 13,  43,  69, 0.4);
-    /* Statuses: "done" and "none" need their own text color to stay readable
-       against the container in both themes. */
+    /* Status colors. --color-status-done is for mitigated, avoided and
+       implemented, and --color-status-none is for out of scope. Each has a
+       matching -text variable so its text stays readable against the page
+       background in both themes. */
     --color-status-open:      var(--color-count-red);
     --color-status-partial:   var(--color-count-orange);
     --color-status-managed:   var(--color-count-blue);
@@ -918,8 +920,8 @@ svg a {
     &:hover text { text-decoration: underline; }
 }
 
-/* Threat and mitigation statuses. The same modifier colors a badge, a
-   summary count box or a matrix cell. */
+/* Colors for threat and mitigation statuses. Each status--* class colors a
+   badge, a count box on the summary page, or a cell in the matrix. */
 .status-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -960,8 +962,9 @@ svg a {
     color: var(--color-7);
 }
 
-/* A matrix cell means "this threat applies here". Keep the marker legible
-   whatever the status background, which can match the empty-cell color. */
+/* A filled matrix cell means the threat applies to that component. Some
+   status colors match the empty-cell color, so the dot uses the theme's
+   text color and a glow to stay visible. */
 td.prop-cell[class*="status--"] {
     color: var(--color-text);
     font-weight: bold;

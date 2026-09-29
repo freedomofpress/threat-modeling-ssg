@@ -19,7 +19,7 @@ uv run demo/model.py | uvx ratm
 
 ## Model format
 
-A model is a Python script using the `Ratm` builders. `demo/model.py` is a commented walkthrough. The report it prints is what `ratm` renders.
+A model is a Python script that uses the `Ratm` builders. `demo/model.py` is a commented example. The script prints a report, and `ratm` turns that report into the site.
 
 **Properties** describe components (`tm.define_properties(...)`). A threat's `requirements` are expressions over them: `prop`, `!prop`, `prop.item`, `a == b`, `a != b`.
 
@@ -29,18 +29,25 @@ A model is a Python script using the `Ratm` builders. `demo/model.py` is a comme
 |---|---|
 | `mitigations` | ids of the mitigations in place |
 | `further_mitigations` | ids of mitigations being considered |
-| `status` | `unmanaged`, `accepted`, `transferred`, `mitigated`, `avoided`, `inform`, `partially mitigated`, `out of scope` (default `unmanaged`) |
-| `impact` | `Low` (1), `Medium` (2), `High` (3) |
-| `likelihood` | `Very Low` (1), `Low` (2), `Medium` (3), `High` (4) |
-| `residual_impact`, `residual_likelihood` | values once mitigations are applied, defaulting to the base ones |
-| `residual_risk` | free-text note on what remains |
-| `threat_actors` | names of registered threat actors |
-| `children` | ids of threats this one decomposes into |
-| `capec_info`, `comment` | description and details. CAPEC severity and likelihood fill `impact` / `likelihood` when those are not given |
+| `status` | `unmanaged`, `accepted`, `transferred`, `mitigated`, `avoided`, `inform`, `partially mitigated`, or `out of scope`. The default is `unmanaged`. |
+| `impact` | `Low` (1), `Medium` (2), or `High` (3) |
+| `likelihood` | `Very Low` (1), `Low` (2), `Medium` (3), or `High` (4) |
+| `residual_impact`, `residual_likelihood` | the values with the mitigations in place. They default to `impact` and `likelihood`. |
+| `residual_risk` | a note on the risk that remains |
+| `threat_actors` | names of threat actors registered with `tm.ThreatActor` |
+| `children` | ids of smaller threats that make up this one |
+| `capec_info`, `comment` | description and details. If `impact` or `likelihood` is not given, the CAPEC severity and likelihood are used instead. CAPEC's five severity levels are mapped onto the three impact levels. |
 
-Risk is impact times likelihood. The status is authoritative. A threat is reported for every component matching its requirements, and the status says how the team is handling it.
+Risk is impact times likelihood. The status says how the team is handling the threat. Mitigations never remove a threat from the report. It is listed for every component that matches its requirements.
 
-**Mitigations** (`tm.Mitigation(id, title=..., ...)`): `description`, `status` (`implemented`, `optional`, `proposed`), and an optional `property` expression. When `property` is set, the report shows per component whether the mitigation is in place.
+**Mitigations** (`tm.Mitigation(id, title=..., ...)`) have a `description`, a `status` (`implemented`, `optional`, or `proposed`), and an optional `property` expression. The report always shows a mitigation's status. When `property` is set, the report also checks each affected component for that property and marks the mitigation as in place or missing there.
 
-**Threat actors** (`tm.ThreatActor(name, description=...)`) are a controlled vocabulary. A threat naming an unknown actor fails the build, as does an unknown mitigation or child id, an invalid label, or a duplicate id.
+**Threat actors** (`tm.ThreatActor(name, description=...)`) must be registered before a threat can name them.
 
+Generating the report fails with an error naming the problem when:
+
+- a threat names an unknown mitigation, threat actor, or child threat, or lists itself as a child
+- a status is not one of the values above
+- an impact or likelihood is given but is not on its scale
+- a mitigation's `property` uses a property the model does not define. This check only runs when the model defines at least one property.
+- two threats, mitigations, or threat actors share an id or name

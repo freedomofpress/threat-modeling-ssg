@@ -250,7 +250,7 @@ class CAPECInfo:
 
 
 def _token_property_names(token: str) -> list[str]:
-    """The property names a requirement/mitigation token refers to."""
+    """Return the property names used in a requirement or mitigation expression."""
     token = token.strip()
     for operator in ("!=", "=="):
         if operator in token:
@@ -263,8 +263,8 @@ def _token_property_names(token: str) -> list[str]:
 class Mitigation:
     """A control that reduces one or more threats.
 
-    `property` optionally names a component property token. When set, the report can
-    tell per component whether the mitigation is implemented.
+    The report always shows the mitigation's status. If `property` names a component
+    property, the report also checks each affected component for it.
     """
 
     id: str
@@ -276,8 +276,8 @@ class Mitigation:
     def property_names(self):
         return _token_property_names(self.property) if self.property else []
 
-    # Declared after the methods above, because a class attribute named `property` would
-    # shadow the builtin decorator for the rest of the class body.
+    # This field must come after the methods above. A class attribute named `property`
+    # hides Python's built-in @property decorator for the rest of the class body.
     property: str = None
 
     def to_dict(self):
@@ -292,7 +292,7 @@ class Mitigation:
 
 @dataclass
 class ThreatActor:
-    """An adversary (or error source) a threat is attributed to."""
+    """Someone who could carry out a threat, or a source of mistakes."""
 
     name: str
     description: str = None

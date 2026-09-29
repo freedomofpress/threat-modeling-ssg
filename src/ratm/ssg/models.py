@@ -22,7 +22,7 @@ class SiteConfig(BaseModel):
 
 class ThreatMapping(BaseModel):
     requirements: list[str] = []
-    # Mitigation ids, resolved through ThreatModel.mitigations.
+    # Mitigation ids. Look them up in ThreatModel.mitigations.
     mitigations: list[str] = []
     further_mitigations: list[str] = []
 
@@ -45,15 +45,18 @@ class Mitigation(BaseModel):
     def property_names(self) -> list[str]:
         return _token_props(self.property) if self.property else []
 
-    # Declared after the methods above, because a class attribute named `property` would
-    # shadow the builtin decorator for the rest of the class body.
+    # This field must come after the methods above. A class attribute named `property`
+    # hides Python's built-in @property decorator for the rest of the class body.
     property: str | None = None
 
     def refers_to_prop(self, prop_key: str) -> bool:
         return prop_key in self.property_names
 
     def implemented_on(self, component: "Component") -> bool | None:
-        """Whether the component satisfies the property token, or None if there is none."""
+        """Return whether the component has the property.
+
+        Return None if `property` is not set.
+        """
         if not self.property:
             return None
         return _token_satisfied(component, self.property)
@@ -70,7 +73,6 @@ class Threat(BaseModel):
     description: str = ""
     details: str = ""
     example: str = ""
-    # `severity` is the pre-impact name of this field (and the CAPEC term).
     impact: str = ""
     likelihood: str = ""
     residual_impact: str = ""
@@ -299,8 +301,8 @@ class ThreatModel(BaseModel):
             if status_counter[status]
         }
 
-        # Actors cover every defined threat, so an actor page is complete even for
-        # threats that no scenario currently exercises.
+        # Include every defined threat, not only those found in a scenario, so an
+        # actor's page lists all of that actor's threats.
         actors_to_threats: defaultdict[str, list[str]] = defaultdict(list)
         for tid, threat in self.threats.items():
             for actor in threat.threat_actors:
@@ -322,7 +324,7 @@ class ThreatModel(BaseModel):
     def threat_mitigations(
         self, threat: Threat, further: bool = False
     ) -> list[Mitigation]:
-        """The Mitigation entities a threat lists, skipping unknown ids."""
+        """Return the mitigations a threat lists. Unknown ids are skipped."""
         ids = (
             threat.mapping.further_mitigations
             if further
@@ -333,7 +335,10 @@ class ThreatModel(BaseModel):
     def mitigation_threats(
         self, mitigation_id: str
     ) -> tuple[list[tuple[str, Threat]], list[tuple[str, Threat]]]:
-        """Threats listing the mitigation as existing, and as a further one."""
+        """Return two lists of threats naming this mitigation.
+
+        The first lists it as in place, the second as a further mitigation.
+        """
         mitigating = [
             (tid, t)
             for tid, t in sorted(self.threats.items())
@@ -349,7 +354,10 @@ class ThreatModel(BaseModel):
     def component_mitigation_states(
         self, component: Component, threat: Threat
     ) -> list[dict[str, Any]]:
-        """Each of the threat's mitigations with its implementation state on the component."""
+        """Return each of the threat's mitigations and whether the component has it.
+
+        The state is None for mitigations that do not set `property`.
+        """
         return [
             {"mitigation": mit, "implemented": mit.implemented_on(component)}
             for mit in self.threat_mitigations(threat)
@@ -358,7 +366,10 @@ class ThreatModel(BaseModel):
     def component_potential_mitigations(
         self, component: Component, threat_ids: Iterable[str]
     ) -> list[Mitigation]:
-        """Property-bearing mitigations of those threats not implemented on the component."""
+        """Return the mitigations of those threats that the component lacks.
+
+        Only mitigations that set `property` can be checked, so only they count.
+        """
         potential: dict[str, Mitigation] = {}
         for tid in threat_ids:
             threat = self.threats.get(tid)
@@ -370,9 +381,11 @@ class ThreatModel(BaseModel):
         return [potential[mid] for mid in sorted(potential)]
 
     def property_mitigation_state(self, prop_key: str) -> list[dict[str, Any]]:
-        """For each mitigation whose property token refers to prop_key: the active
-        threats listing it, and the affected components where it is implemented or
-        missing."""
+        """Describe each mitigation whose `property` uses prop_key.
+
+        Each entry lists the threats that name the mitigation and appear in a scenario,
+        and the affected components that have or lack the property.
+        """
         analysis = self.analyze()
         states = []
         for mid in sorted(self.mitigations):
@@ -411,7 +424,7 @@ class ThreatModel(BaseModel):
         return states
 
     def parent_threats(self, threat_id: str) -> list[str]:
-        """Ids of the threats listing threat_id as a child."""
+        """Return the ids of the threats that list threat_id as a child."""
         if self._parents is None:
             parents: defaultdict[str, list[str]] = defaultdict(list)
             for tid, threat in self.threats.items():

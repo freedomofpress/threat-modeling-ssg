@@ -39,21 +39,21 @@
     <div class="count-box count-box--{{ threat.impact_label | lower }}">
         <div class="count-box__value">{{ threat.impact_label }}</div>
         {% if threat.residual_impact_label != threat.impact_label %}
-        <div class="count-box__note">residual: {{ threat.residual_impact_label }}</div>
+        <div class="count-box__note">after mitigations: {{ threat.residual_impact_label }}</div>
         {% endif %}
         <div class="count-box__label">Impact</div>
     </div>
     <div class="count-box count-box--blue">
         <div class="count-box__value">{{ threat.likelihood_label }}</div>
         {% if threat.residual_likelihood_label != threat.likelihood_label %}
-        <div class="count-box__note">residual: {{ threat.residual_likelihood_label }}</div>
+        <div class="count-box__note">after mitigations: {{ threat.residual_likelihood_label }}</div>
         {% endif %}
         <div class="count-box__label">Likelihood</div>
     </div>
     <div class="count-box count-box--red">
         <div class="count-box__value">{{ m.risk(threat) }}</div>
         {% if threat.residual_risk_score != threat.risk_score %}
-        <div class="count-box__note">residual: {{ threat.residual_risk_score if threat.residual_risk_score is not none else "?" }}</div>
+        <div class="count-box__note">after mitigations: {{ threat.residual_risk_score if threat.residual_risk_score is not none else "Unknown" }}</div>
         {% endif %}
         <div class="count-box__label">Risk</div>
     </div>
@@ -95,7 +95,7 @@
             <th>ID</th>
             <th>Mitigation</th>
             <th>Status</th>
-            <th>On affected components</th>
+            <th>Affected components</th>
         </tr>
     </thead>
     <tbody>
@@ -106,10 +106,10 @@
             <td>{{ m.mitigation_status(item.mitigation) }}</td>
             <td>
                 {% if item.per_component is none %}
-                <em>not tracked per component</em>
+                <em>not checked per component</em>
                 {% else %}
                 {% for name, implemented in item.per_component %}
-                <a href="component_{{ name | slugify }}.html" class="tag {{ 'tag--true' if implemented else 'tag--false' }}">{{ name }}</a>
+                {{ m.presence_tag(name, implemented, href="component_" ~ (name | slugify) ~ ".html") }}
                 {% else %}
                 <em>no affected components</em>
                 {% endfor %}
@@ -135,14 +135,14 @@
 {% if children or parents %}
 <h2>Related threats</h2>
 {% if parents %}
-<p>Part of:
+<p>This threat is part of:
     {% for pid, parent in parents %}
     <a href="threat_{{ pid }}.html">{{ pid }}</a>{% if parent %} ({{ parent.description }}){% endif %}{% if not loop.last %}, {% endif %}
     {% endfor %}
 </p>
 {% endif %}
 {% if children %}
-<p>Child threats:</p>
+<p>Smaller threats that make up this one:</p>
 <ul class="prop-list">
     {% for cid, child in children %}
     <li><a href="threat_{{ cid }}.html">{{ cid }}</a>{% if child %} <span class="prop-meta">{{ child.description }}</span> {{ m.status_badge(child.status) }}{% endif %}</li>

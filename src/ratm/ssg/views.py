@@ -262,7 +262,7 @@ def _threat_sort_key(item: tuple[str, Threat]) -> tuple[int, int]:
 
 
 def _risk_sort_key(item: tuple[str, Threat]) -> tuple[int, str]:
-    """Highest risk first, unknown risk last."""
+    """Highest risk first. Threats with no risk score go last."""
     tid, threat = item
     return (-(threat.risk_score or 0), tid)
 
