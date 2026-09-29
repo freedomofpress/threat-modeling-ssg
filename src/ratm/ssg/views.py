@@ -307,6 +307,11 @@ def threats_components_view(
         "config": config,
         "model": model,
         "active_threats": active_threats,
+        "status_legend": [
+            status
+            for status in scales.THREAT_STATUSES
+            if any(t.status == status for _, t in active_threats)
+        ],
         "sorted_components": sorted_components,
         "component_classes": Counter(
             comp.component_class or "Other" for _, comp in sorted_components
