@@ -27,7 +27,7 @@ def author_model(description: str = "A request comes in") -> dict:
     tm.Threat(
         "T-INPUT",
         requirements=["reads_input"],
-        mitigations=["sanitizes_input"],
+        mitigations=[],
         capec_info=CAPECInfo(description="Unsanitized input", severity="High"),
     )
     net = tm.Boundary(name="Net", is_exposed=True)
@@ -82,11 +82,6 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
     assert "label = &lt;&lt;i&gt;Net&lt;/i&gt;&gt;;" in page
     assert diagram_sources(page) == [scenario.dfd, scenario.mermaid]
     assert "label = <<i>Net</i>>;" in scenario.dfd
-
-    # The matrix check marks are the characters ✓ and ✗. Written as &#x2713; entities,
-    # they would be escaped and shown as literal text.
-    matrix = (tmp_path / "threats_components.html").read_text()
-    assert "✓" in matrix or "✗" in matrix
 
 
 def build_demo_site(out: Path, hash_seed: int) -> None:

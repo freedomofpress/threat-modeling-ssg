@@ -6,9 +6,11 @@ from .components import (
     ComponentProperties,
     Dataflow,
     Finding,
+    Mitigation,
     Property,
     Scenario,
     Threat,
+    ThreatActor,
     load_capec_db,
 )
 from .ratm import Ratm
@@ -22,10 +24,12 @@ __all__ = [
     "ComponentProperties",
     "Dataflow",
     "Finding",
+    "Mitigation",
     "Property",
     "Ratm",
     "Report",
     "Scenario",
     "Threat",
+    "ThreatActor",
     "load_capec_db",
 ]

@@ -5,6 +5,8 @@ import hashlib
 import pathlib
 from dataclasses import dataclass
 
+from . import scales
+
 
 @functools.cache
 def load_capec_db(capec_db_path: pathlib.Path):
@@ -247,15 +249,110 @@ class CAPECInfo:
         return {k: v if v else "" for k, v in info.items()}
 
 
+def _token_property_names(token: str) -> list[str]:
+    """The property names a requirement/mitigation token refers to."""
+    token = token.strip()
+    for operator in ("!=", "=="):
+        if operator in token:
+            left, right = token.split(operator, 1)
+            return [left.strip(), right.strip()]
+    return [token.removeprefix("!").split(".", 1)[0]]
+
+
+@dataclass
+class Mitigation:
+    """A control that reduces one or more threats.
+
+    `property` optionally names a component property token. When set, the report can
+    tell per component whether the mitigation is implemented.
+    """
+
+    id: str
+    title: str
+    description: str = None
+    status: str = scales.DEFAULT_MITIGATION_STATUS
+
+    @property
+    def property_names(self):
+        return _token_property_names(self.property) if self.property else []
+
+    # Declared after the methods above, because a class attribute named `property` would
+    # shadow the builtin decorator for the rest of the class body.
+    property: str = None
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description or "",
+            "status": self.status,
+            "property": self.property,
+        }
+
+
+@dataclass
+class ThreatActor:
+    """An adversary (or error source) a threat is attributed to."""
+
+    name: str
+    description: str = None
+
+    def to_dict(self):
+        return {"name": self.name, "description": self.description or ""}
+
+
 @dataclass
 class Threat:
-    """The requirements and mitigations for a threat, alongside its info."""
+    """The requirements, mitigations, and risk information for a threat."""
 
     id: str
     requirements: list[str]
-    mitigations: list[str]
+    mitigations: list[str] = dataclasses.field(default_factory=list)
     capec_info: CAPECInfo = None
     comment: str = None
+    status: str = scales.DEFAULT_THREAT_STATUS
+    impact: str = None
+    likelihood: str = None
+    residual_impact: str = None
+    residual_likelihood: str = None
+    residual_risk: str = None
+    further_mitigations: list[str] = dataclasses.field(default_factory=list)
+    children: list[str] = dataclasses.field(default_factory=list)
+    threat_actors: list[str] = dataclasses.field(default_factory=list)
+
+    @property
+    def impact_label(self):
+        if self.impact:
+            return self.impact
+        if self.capec_info and self.capec_info.severity:
+            return scales.CAPEC_SEVERITY_TO_IMPACT.get(self.capec_info.severity)
+        return None
+
+    @property
+    def likelihood_label(self):
+        if self.likelihood:
+            return self.likelihood
+        if self.capec_info and self.capec_info.likelihood:
+            return self.capec_info.likelihood
+        return None
+
+    @property
+    def residual_impact_label(self):
+        return self.residual_impact or self.impact_label
+
+    @property
+    def residual_likelihood_label(self):
+        return self.residual_likelihood or self.likelihood_label
+
+    @property
+    def risk_score(self):
+        return scales.risk_score(self.impact_label, self.likelihood_label)
+
+    @property
+    def residual_risk_score(self):
+        return scales.risk_score(
+            self.residual_impact_label, self.residual_likelihood_label
+        )
 
     def populate_capec_info(self, capec_db_path: str):
         capec_threats = load_capec_db(capec_db_path)
@@ -276,19 +373,24 @@ class Threat:
             if not component.matches(req):
                 return False
 
-        for mit in self.mitigations:
-            if component.matches(mit):
-                return False
-
         return True
 
     def to_dict(self):
         info = self.capec_info.to_dict() if self.capec_info else CAPECInfo("").to_dict()
         info["SID"] = self.id
         info["comment"] = self.comment or ""
+        info["status"] = self.status
+        info["impact"] = self.impact_label or ""
+        info["likelihood"] = self.likelihood_label or ""
+        info["residual_impact"] = self.residual_impact_label or ""
+        info["residual_likelihood"] = self.residual_likelihood_label or ""
+        info["residual_risk"] = self.residual_risk or ""
+        info["children"] = list(self.children)
+        info["threat_actors"] = list(self.threat_actors)
         info["mapping"] = {}
         info["mapping"]["requirements"] = self.requirements
-        info["mapping"]["mitigations"] = self.mitigations
+        info["mapping"]["mitigations"] = list(self.mitigations)
+        info["mapping"]["further_mitigations"] = list(self.further_mitigations)
         return info
 
 
