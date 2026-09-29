@@ -35,23 +35,91 @@ tm.define_properties(
 )
 
 
+# -- Mitigations
+#
+# Mitigations are first-class. Each has an id, a title, and a status ("implemented",
+# "optional", or "proposed"). Optionally:
+#
+# - `property` names a component property. The report then shows, component by
+#   component, whether the mitigation is in place.
+
+tm.Mitigation(
+    "MIT-VERIFY-DEPS",
+    title="Pin and hash-check dependencies",
+    description="Lockfiles with hashes make the registry unable to swap a package.",
+    property="verifies_resources.deps",
+)
+tm.Mitigation(
+    "MIT-STRONG-CREDS",
+    title="Hardware-backed or short-lived credentials",
+    property="uses_strong_credentials",
+)
+tm.Mitigation(
+    "MIT-ENCRYPT-SECRETS",
+    title="Encrypt tokens at rest",
+    property="encrypts_secrets",
+    status="proposed",
+)
+tm.Mitigation(
+    "MIT-VERIFY-SOURCE",
+    title="Verify the origin of executed code",
+    property="verifies_resources.source",
+    status="proposed",
+)
+tm.Mitigation(
+    "MIT-CSP",
+    title="Content Security Policy on the report",
+    description="Restricts what the vendored scripts may load or connect to.",
+    status="optional",
+)
+
+# -- Threat actors
+#
+# Threats are attributed to actors by name. An unknown name fails the build.
+
+tm.ThreatActor(
+    "Registry impersonator",
+    description="Whoever can answer for PyPI or NPM: a MITM or a compromised mirror.",
+)
+tm.ThreatActor(
+    "Malicious maintainer",
+    description="Someone with publish rights on a dependency.",
+)
+tm.ThreatActor("Any", description="No particular capability required.")
+
+# -- Threats
+#
 # You can define your own threats, naming them and providing:
 #
 # - a list of requirements, that need to be true for this threat to apply
-# - a list of mitigations. If any of these are true, the threat is considered mitigated.
+# - a list of mitigation ids, and optionally `further_mitigations` that are being
+#   considered
+# - a `status`: unmanaged, accepted, transferred, mitigated, avoided, inform, partially
+#   mitigated, or out of scope. The status is authoritative. A threat is reported for
+#   every component matching its requirements, whatever the mitigations say.
+# - `impact` (Low/Medium/High) and `likelihood` (Very Low/Low/Medium/High). Risk is
+#   their product. `residual_impact` / `residual_likelihood` describe the situation with
+#   the mitigations in place, `residual_risk` explains it.
+# - `threat_actors`, and `children` for threats this one decomposes into.
 #
-# Threats which are not CAPEC ones can carry their own information, so the report
-# has something to display (severity, description, details).
+# Threats which are not CAPEC ones can carry their own information, so the report has
+# something to display (description, details). CAPEC severity and likelihood are used
+# when `impact` / `likelihood` are not given.
 
 # In this example, we use sub-resources, using the dot separator.
 tm.Threat(
     "RATM-1-DEPS",
     requirements=["loads_resources.deps"],
-    mitigations=["verifies_resources.deps"],
+    mitigations=["MIT-VERIFY-DEPS"],
+    status="partially mitigated",
+    impact="High",
+    likelihood="Medium",
+    residual_likelihood="Low",
+    residual_risk="The ratm package itself still installs its npm assets unpinned.",
+    threat_actors=["Registry impersonator", "Malicious maintainer"],
     comment="Check that every component that explicitly loads packages verify them",
     capec_info=CAPECInfo(
         description="Unverified dependencies",
-        severity="High",
         details=(
             "A component installing packages without checking their integrity"
             " runs whatever the registry (or someone impersonating it) serves."
@@ -63,11 +131,14 @@ tm.Threat(
 tm.Threat(
     "RATM-2-WEAKCREDS",
     requirements=["requires_credentials != uses_strong_credentials"],
-    mitigations=["uses_strong_credentials"],
+    mitigations=["MIT-STRONG-CREDS"],
+    status="inform",
+    impact="Medium",
+    likelihood="Low",
+    threat_actors=["Any"],
     comment="Anything asking for credentials should ask for strong ones",
     capec_info=CAPECInfo(
         description="Weak credentials on an authenticated component",
-        severity="Medium",
         details=(
             "Credentials that are neither hardware-backed nor short-lived can be"
             " replayed by whoever gets a copy of them."
@@ -79,11 +150,15 @@ tm.Threat(
 tm.Threat(
     "RATM-3-SECRETS",
     requirements=["stores_secrets", "!encrypts_secrets"],
-    mitigations=["encrypts_secrets"],
+    further_mitigations=["MIT-ENCRYPT-SECRETS"],
+    status="accepted",
+    impact="High",
+    likelihood="Low",
+    residual_risk="Accepted until the token can be scoped to a single project.",
+    threat_actors=["Any"],
     comment="Secrets kept on disk should not be readable as-is",
     capec_info=CAPECInfo(
         description="Secrets stored unencrypted",
-        severity="Very High",
         details=(
             "A publishing token written in cleartext can be read by any process"
             " running as the same user."
@@ -94,11 +169,16 @@ tm.Threat(
 tm.Threat(
     "RATM-4-EXEC",
     requirements=["executes_code"],
-    mitigations=["verifies_resources.source"],
+    mitigations=["MIT-CSP"],
+    further_mitigations=["MIT-VERIFY-SOURCE"],
+    status="unmanaged",
+    impact="High",
+    likelihood="Medium",
+    threat_actors=["Malicious maintainer"],
+    children=["RATM-1-DEPS"],
     comment="Running someone else's code means trusting where it came from",
     capec_info=CAPECInfo(
         description="Execution of unverified code",
-        severity="High",
         details=(
             "Both the generator and the browser rendering the report end up"
             " executing code nobody reviewed at that point."
