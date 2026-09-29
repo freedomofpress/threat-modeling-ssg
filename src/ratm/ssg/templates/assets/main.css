@@ -949,7 +949,7 @@ svg a {
 .count-box.status--accepted, .count-box.status--transferred,
 .count-box.status--inform              { box-shadow: 0 0 10px var(--color-count-blue-glow); }
 .count-box.status--mitigated, .count-box.status--avoided
-                                       { box-shadow: 0 0 10px var(--color-count-orange-glow); }
+                                       { box-shadow: 0 0 10px var(--color-count-red-glow); }
 .count-box.status--out-of-scope        { box-shadow: 0 0 10px var(--color-count-grey-glow); }
 .count-box.status--mitigated .count-box__value, .count-box.status--mitigated .count-box__label,
 .count-box.status--avoided .count-box__value,   .count-box.status--avoided .count-box__label

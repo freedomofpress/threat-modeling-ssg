@@ -231,3 +231,15 @@ def test_report_accepts_unknown_labels_when_none(tm: Ratm) -> None:
     assert threat["impact"] == ""
     assert threat["likelihood"] == ""
     assert threat["status"] == "unmanaged"
+
+
+def test_capec_likelihood_off_the_scale_is_unknown(tm: Ratm) -> None:
+    """CAPEC allows "Unknown" likelihood, which must not fail the author's build."""
+    tm.Threat(
+        "CAPEC-9",
+        requirements=["reads_input"],
+        capec_info=CAPECInfo(description="d", severity="High", likelihood="Unknown"),
+    )
+    threat = tm.Report([make_scenario(tm)]).generate()["threats"][0]
+    assert threat["impact"] == "High"
+    assert threat["likelihood"] == ""
