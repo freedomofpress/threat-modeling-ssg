@@ -3,8 +3,9 @@ from collections import Counter
 from collections.abc import Iterable
 from typing import Any
 
+from .. import scales
 from .graphs import generate_highlighted_dataflow
-from .models import Component, SiteConfig, ThreatModel, _token_satisfied
+from .models import Component, SiteConfig, Threat, ThreatModel
 from .utils import display_token, slugify, view
 
 
@@ -22,31 +23,24 @@ def threats_view(
     model: ThreatModel,
 ) -> dict[str, Any]:
     all_props = list(model.properties)
-    severity_tables = []
-    for severity in ["Very High", "High", "Medium", "Low", "Unknown"]:
+    impact_tables = []
+    for impact in scales.IMPACT_ORDER:
         threats = sorted(
-            (tid, t)
-            for tid, t in model.threats.items()
-            if (t.severity or "Unknown") == severity
+            (tid, t) for tid, t in model.threats.items() if t.impact_label == impact
         )
         if not threats:
             continue
         props = [
             p
             for p in all_props
-            if any(
-                t.mapping.requirements_for_prop(p) or t.mapping.mitigations_for_prop(p)
-                for _, t in threats
-            )
+            if any(t.mapping.requirements_for_prop(p) for _, t in threats)
         ]
-        severity_tables.append(
-            {"severity": severity, "threats": threats, "props": props}
-        )
+        impact_tables.append({"impact": impact, "threats": threats, "props": props})
     return {
         "config": config,
         "model": model,
         "analysis": model.analyze(),
-        "severity_tables": severity_tables,
+        "impact_tables": impact_tables,
     }
 
 
@@ -91,6 +85,16 @@ def threat_view(
                     "highlighted_dfd": highlighted_dfd,
                 }
             )
+        mitigations = []
+        for mit in model.threat_mitigations(threat):
+            per_component = None
+            if mit.property:
+                per_component = [
+                    (name, mit.implemented_on(model.components[name]))
+                    for name in affected_components
+                    if name in model.components
+                ]
+            mitigations.append({"mitigation": mit, "per_component": per_component})
         yield {
             "config": config,
             "model": model,
@@ -100,6 +104,12 @@ def threat_view(
             "scenarios": scenario_names,
             "frequency": analysis["threat_counter"].get(threat_id, 0),
             "threat_scenario_data": threat_scenario_data,
+            "mitigations": mitigations,
+            "further_mitigations": model.threat_mitigations(threat, further=True),
+            "children": [(cid, model.threats.get(cid)) for cid in threat.children],
+            "parents": [
+                (pid, model.threats[pid]) for pid in model.parent_threats(threat_id)
+            ],
         }
 
 
@@ -129,13 +139,11 @@ def component_view(
             "component": component,
             "threats": threat_ids,
             "scenarios": scenario_names,
-            "unimplemented_mitigations": model.component_unimplemented_mitigations(
+            "potential_mitigations": model.component_potential_mitigations(
                 component, threat_ids
             ),
-            "threat_unimplemented": {
-                tid: model.threat_unimplemented_mitigations(
-                    component, model.threats[tid]
-                )
+            "threat_mitigations": {
+                tid: model.component_mitigation_states(component, model.threats[tid])
                 for tid in threat_ids
                 if tid in model.threats
             },
@@ -193,9 +201,6 @@ def property_view(
 ) -> Iterable[dict[str, Any]]:
     analysis = model.analyze()
     for prop_key, prop in model.properties.items():
-        mitigated_threats, would_be_mitigated_threats, benefit_components = (
-            model.property_mitigation_state(prop_key)
-        )
         requiring_threats = sorted(
             (
                 (tid, t)
@@ -214,9 +219,7 @@ def property_view(
                 "label": prop.name,
                 "display_label": display_token(prop_key).title(),
                 "slug": slug,
-                "mitigated_threats": mitigated_threats,
-                "would_be_mitigated_threats": would_be_mitigated_threats,
-                "benefit_components": benefit_components,
+                "mitigation_states": model.property_mitigation_state(prop_key),
                 "requiring_threats": requiring_threats,
             },
         }
@@ -248,6 +251,22 @@ def scenarios_view(
     return {"config": config, "model": model}
 
 
+def _threat_sort_key(item: tuple[str, Threat]) -> tuple[int, int]:
+    """Highest impact first, then by the number in the id."""
+    tid, threat = item
+    match = re.search(r"\d+", tid)
+    return (
+        scales.IMPACT_ORDER.index(threat.impact_label),
+        int(match.group()) if match else 0,
+    )
+
+
+def _risk_sort_key(item: tuple[str, Threat]) -> tuple[int, str]:
+    """Highest risk first, unknown risk last."""
+    tid, threat = item
+    return (-(threat.risk_score or 0), tid)
+
+
 @view("/threats_components.html", log="Generating threats_components.html...")
 def threats_components_view(
     config: SiteConfig,
@@ -255,21 +274,13 @@ def threats_components_view(
 ) -> dict[str, Any]:
     analysis = model.analyze()
 
-    severity_order = {"Very High": 0, "High": 1, "Medium": 2, "Low": 3, "Unknown": 4}
-
-    def sort_key(item: tuple[str, Any]) -> tuple[int, int]:
-        tid, threat = item
-        sev = severity_order.get(threat.severity or "Unknown", 4)
-        match = re.search(r"\d+", tid)
-        return (sev, int(match.group()) if match else 0)
-
     active_threats = sorted(
         (
             (tid, t)
             for tid, t in model.threats.items()
             if tid in analysis["threat_counter"]
         ),
-        key=sort_key,
+        key=_threat_sort_key,
     )
 
     affected: dict[str, Component] = {}
@@ -280,13 +291,12 @@ def threats_components_view(
             if not threat.applies_to(comp):
                 continue
             affected[comp_name] = comp
-            satisfied, missing = [], []
-            for tok in threat.mapping.mitigations:
-                (satisfied if _token_satisfied(comp, tok) else missing).append(tok)
             status[tid][comp_name] = {
-                "mitigated": bool(satisfied),
-                "satisfied": satisfied,
-                "missing": missing,
+                "states": [
+                    st
+                    for st in model.component_mitigation_states(comp, threat)
+                    if st["implemented"] is not None
+                ],
             }
 
     sorted_components = sorted(
@@ -295,6 +305,7 @@ def threats_components_view(
 
     return {
         "config": config,
+        "model": model,
         "active_threats": active_threats,
         "sorted_components": sorted_components,
         "component_classes": Counter(
@@ -302,3 +313,97 @@ def threats_components_view(
         ),
         "status": status,
     }
+
+
+@view("/mitigations.html", log="Generating mitigations.html...")
+def mitigations_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    rows = []
+    for mid in sorted(model.mitigations):
+        mitigating, proposing = model.mitigation_threats(mid)
+        rows.append((model.mitigations[mid], mitigating, proposing))
+    return {"config": config, "model": model, "rows": rows}
+
+
+@view(
+    "/mitigation_{mitigation_id}.html",
+    template="mitigation.html",
+    log=lambda count: f"Generating {count} mitigation pages...",
+)
+def mitigation_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> Iterable[dict[str, Any]]:
+    analysis = model.analyze()
+    for mid, mitigation in model.mitigations.items():
+        mitigating, proposing = model.mitigation_threats(mid)
+        component_states = None
+        if mitigation.property:
+            affected = sorted(
+                {
+                    name
+                    for tid, _ in mitigating
+                    for name in analysis["threats_to_components"].get(tid, set())
+                }
+            )
+            component_states = [
+                (
+                    name,
+                    model.components[name],
+                    mitigation.implemented_on(model.components[name]),
+                )
+                for name in affected
+                if name in model.components
+            ]
+        yield {
+            "config": config,
+            "model": model,
+            "mitigation_id": mid,
+            "mitigation": mitigation,
+            "threats": mitigating,
+            "further_threats": proposing,
+            "component_states": component_states,
+        }
+
+
+@view("/threat_actors.html", log="Generating threat_actors.html...")
+def threat_actors_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    analysis = model.analyze()
+    rows = [
+        (actor, analysis["actors_to_threats"].get(name, []))
+        for name, actor in sorted(model.threat_actors.items())
+    ]
+    return {"config": config, "model": model, "rows": rows}
+
+
+@view(
+    "/threat_actor_{actor_slug}.html",
+    template="threat_actor.html",
+    log=lambda count: f"Generating {count} threat actor pages...",
+)
+def threat_actor_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> Iterable[dict[str, Any]]:
+    analysis = model.analyze()
+    for name, actor in model.threat_actors.items():
+        threats = sorted(
+            (
+                (tid, model.threats[tid])
+                for tid in analysis["actors_to_threats"].get(name, [])
+                if tid in model.threats
+            ),
+            key=_risk_sort_key,
+        )
+        yield {
+            "config": config,
+            "model": model,
+            "actor": actor,
+            "actor_slug": slugify(name),
+            "threats": threats,
+        }

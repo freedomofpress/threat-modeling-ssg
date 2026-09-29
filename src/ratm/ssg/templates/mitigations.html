@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "includes/macros.html" as m %}
+{% set active_page = "mitigations.html" %}
+{% block title %}Mitigations - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Mitigations</h1>
+
+<p>{{ rows | length }} mitigations defined.</p>
+
+{% if rows %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Mitigation</th>
+            <th>Status</th>
+            <th>Mitigates</th>
+            <th>Proposed for</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mitigation, mitigating, proposing in rows %}
+        <tr>
+            <td>{{ m.mitigation_link(mitigation) }}</td>
+            <td>{{ mitigation.title }}</td>
+            <td>{{ m.mitigation_status(mitigation) }}</td>
+            <td>{% for tid, _ in mitigating %}<a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+            <td>{% for tid, _ in proposing %}<a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No mitigations defined.</em></p>
+{% endif %}
+
+<p><a href="index.html">Back to Summary</a></p>
+{% endblock %}

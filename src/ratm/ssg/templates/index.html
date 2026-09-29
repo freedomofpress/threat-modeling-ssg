@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "includes/macros.html" as m %}
 {% set active_page = "index.html" %}
 
 {% block title %}Summary - Threat Model{% endblock %}
@@ -24,7 +25,23 @@
         <div class="count-box__value">{{ model.scenarios | length }}</div>
         <div class="count-box__label">Scenarios</div>
     </div>
+    <a href="mitigations.html" class="count-box count-box--teal">
+        <div class="count-box__value">{{ model.mitigations | length }}</div>
+        <div class="count-box__label">Mitigations</div>
+    </a>
 </div>
+
+{% if analysis.status_distribution %}
+<h2>Threats by status</h2>
+<div class="stats">
+    {% for status, count in analysis.status_distribution.items() %}
+    <div class="count-box status--{{ status | status_slug }}">
+        <div class="count-box__value">{{ count }}</div>
+        <div class="count-box__label">{{ status }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 <h2>Threats by frequency <a href="threats.html" class="section-link">See all threats →</a></h2>
 <table>
@@ -32,7 +49,8 @@
         <tr>
             <th>Threat ID</th>
             <th>Description</th>
-            <th>Severity</th>
+            <th>Status</th>
+            <th>Risk</th>
             <th>Occurrences</th>
         </tr>
     </thead>
@@ -43,7 +61,8 @@
         <tr>
             <td><a href="threat_{{ threat_id }}.html">{{ threat_id }}</a></td>
             <td>{{ model.threats[threat_id].description }}</td>
-            <td>{{ model.threats[threat_id].severity or "Unknown" }}</td>
+            <td>{{ m.status_badge(model.threats[threat_id].status) }}</td>
+            <td>{{ m.risk(model.threats[threat_id]) }}</td>
             <td class="freq-cell" style="background: linear-gradient(to right, var(--color-7) {{ pct }}%, transparent {{ pct }}%)">{{ count }}</td>
         </tr>
         {% endfor %}

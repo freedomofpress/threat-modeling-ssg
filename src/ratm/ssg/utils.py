@@ -96,3 +96,15 @@ def display_token(token: str) -> str:
 def property_href(token: str) -> str:
     base = str(token).replace("!", "").split(".")[0]
     return f"property_{slugify(base)}.html"
+
+
+def status_slug(value: str) -> str:
+    return str(value).replace(" ", "-")
+
+
+def mitigation_href(mitigation_id: str) -> str:
+    return f"mitigation_{mitigation_id}.html"
+
+
+def threat_actor_href(name: str) -> str:
+    return f"threat_actor_{slugify(name)}.html"

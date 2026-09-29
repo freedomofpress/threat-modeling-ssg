@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% set active_page = "threat_actors.html" %}
+{% block title %}Threat Actors - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Threat Actors</h1>
+
+{% if rows %}
+<table>
+    <thead>
+        <tr>
+            <th>Actor</th>
+            <th>Description</th>
+            <th>Threats</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for actor, threat_ids in rows %}
+        <tr>
+            <td><a href="{{ actor.name | threat_actor_href }}">{{ actor.name }}</a></td>
+            <td>{{ actor.description }}</td>
+            <td>{{ threat_ids | length }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No threat actors defined.</em></p>
+{% endif %}
+
+<p><a href="index.html">Back to Summary</a></p>
+{% endblock %}
