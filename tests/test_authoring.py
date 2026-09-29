@@ -1,4 +1,4 @@
-"""Tests for the authoring layer: Ratm builders, Threat, Mitigation, Report."""
+"""Tests for the model code: the Ratm builders, Threat, Mitigation, and Report."""
 
 import pytest
 
@@ -77,7 +77,7 @@ def test_ratm_rejects_duplicate_ids(tm: Ratm) -> None:
 
 
 def test_threat_matches_ignores_mitigations(tm: Ratm) -> None:
-    """Applicability is decided by requirements alone. Status is authoritative."""
+    """Only the requirements decide whether a threat applies."""
     threat = tm.Threat("T1", requirements=["reads_input"], mitigations=["M-SANITIZE"])
     a = tm.Component(name="A", reads_input=True, sanitizes_input=True)
     assert threat.matches(a) is True
@@ -131,7 +131,7 @@ def test_threat_to_dict_shape() -> None:
     assert data["SID"] == "T1"
     assert data["status"] == "partially mitigated"
     assert data["impact"] == "High"
-    assert data["severity"] == "Medium"  # raw CAPEC text is kept
+    assert data["severity"] == "Medium"  # the original CAPEC severity is still included
     assert data["likelihood"] == "Low"
     assert data["residual_impact"] == "Medium"
     assert data["residual_likelihood"] == "Low"

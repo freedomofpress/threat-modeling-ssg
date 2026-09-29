@@ -37,11 +37,10 @@ tm.define_properties(
 
 # -- Mitigations
 #
-# Mitigations are first-class. Each has an id, a title, and a status ("implemented",
-# "optional", or "proposed"). Optionally:
-#
-# - `property` names a component property. The report then shows, component by
-#   component, whether the mitigation is in place.
+# Each mitigation is its own object with an id, a title, and a status: "implemented",
+# "optional", or "proposed". The report shows every mitigation's status. `property`
+# optionally names a component property. When it is set, the report also checks each
+# affected component for that property.
 
 tm.Mitigation(
     "MIT-VERIFY-DEPS",
@@ -75,7 +74,8 @@ tm.Mitigation(
 
 # -- Threat actors
 #
-# Threats are attributed to actors by name. An unknown name fails the build.
+# Each threat lists its actors by name. A name that was not registered with
+# tm.ThreatActor fails the build.
 
 tm.ThreatActor(
     "Registry impersonator",
@@ -92,19 +92,20 @@ tm.ThreatActor("Any", description="No particular capability required.")
 # You can define your own threats, naming them and providing:
 #
 # - a list of requirements, that need to be true for this threat to apply
-# - a list of mitigation ids, and optionally `further_mitigations` that are being
-#   considered
+# - a list of mitigation ids that are in place, and optionally `further_mitigations`
+#   that are being considered
 # - a `status`: unmanaged, accepted, transferred, mitigated, avoided, inform, partially
-#   mitigated, or out of scope. The status is authoritative. A threat is reported for
-#   every component matching its requirements, whatever the mitigations say.
-# - `impact` (Low/Medium/High) and `likelihood` (Very Low/Low/Medium/High). Risk is
-#   their product. `residual_impact` / `residual_likelihood` describe the situation with
-#   the mitigations in place, `residual_risk` explains it.
-# - `threat_actors`, and `children` for threats this one decomposes into.
+#   mitigated, or out of scope. The status says how the threat is handled. Mitigations
+#   never remove a threat from the report. It is listed for every component that matches
+#   its requirements.
+# - `impact` (Low, Medium, or High) and `likelihood` (Very Low, Low, Medium, or High).
+#   Risk is impact times likelihood. `residual_impact` and `residual_likelihood` give
+#   the values with the mitigations in place, and `residual_risk` explains what is left.
+# - `threat_actors`, and `children` listing smaller threats that make up this one.
 #
-# Threats which are not CAPEC ones can carry their own information, so the report has
-# something to display (description, details). CAPEC severity and likelihood are used
-# when `impact` / `likelihood` are not given.
+# Threats which are not CAPEC ones can carry their own description and details for the
+# report to display. When `impact` or `likelihood` is not given, the CAPEC severity and
+# likelihood are used instead.
 
 # In this example, we use sub-resources, using the dot separator.
 tm.Threat(

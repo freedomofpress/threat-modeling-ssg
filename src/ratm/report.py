@@ -46,7 +46,7 @@ class Report:
         return {actor.name: actor.to_dict() for actor in self.threat_actors}
 
     def validate(self):
-        """Check cross-references and labels, raising ValueError on the first problem."""
+        """Check ids, names, and labels. Raise ValueError on the first problem."""
         threat_ids = _unique_ids("threat", [t.id for t in self.threats])
         mitigation_ids = _unique_ids("mitigation", [m.id for m in self.mitigations])
         actor_names = _unique_ids("threat actor", [a.name for a in self.threat_actors])
@@ -57,7 +57,8 @@ class Report:
                 raise ValueError(
                     f"Mitigation {mit.id} has unknown status '{mit.status}'"
                 )
-            # Only meaningful when the model defines properties at all.
+            # With no properties defined there is nothing to check against, and a report
+            # built from scenarios alone should still generate.
             if property_names:
                 for name in mit.property_names:
                     if name not in property_names:

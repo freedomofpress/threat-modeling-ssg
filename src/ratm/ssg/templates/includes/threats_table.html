@@ -21,7 +21,7 @@
             <td class="prop-sticky{% if is_active %} prop-sticky--active{% endif %}" title="{{ threat_id }}: {{ threat.description }}">
                 <a href="threat_{{ threat_id }}.html">{{ threat_id }}</a>
                 <div class="prop-meta">{{ threat.description | truncate(40) }}</div>
-                <div class="prop-meta">{{ m.status_badge(threat.status) }} <span class="risk-score" title="risk = impact × likelihood">risk {{ m.risk(threat) }}</span></div>
+                <div class="prop-meta">{{ m.status_badge(threat.status) }} <span class="risk-score" title="Risk is impact times likelihood">Risk {{ m.risk(threat) }}</span></div>
             </td>
             {% for prop in group.props %}
             {% set req_tokens = threat.mapping.requirements_for_prop(prop) %}

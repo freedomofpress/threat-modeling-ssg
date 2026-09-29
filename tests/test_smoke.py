@@ -118,7 +118,10 @@ def test_threat_page_contents(tmp_path: Path) -> None:
         assert needle in page, needle
     # risk 9 (High x Medium) and residual 6 (High x Low)
     assert '<div class="count-box__value">9</div>' in page
-    assert "residual: 6" in page
+    assert "after mitigations: 6" in page
+    # Per-component state is spelled out, not shown by colour alone.
+    assert "Web app: in place" in page
+    assert "Worker: missing" in page
     child = (tmp_path / "threat_T-DEPS.html").read_text()
     assert "threat_T-INPUT.html" in child
 
@@ -138,6 +141,7 @@ def test_summary_and_matrix(tmp_path: Path) -> None:
     render(author_model(), tmp_path)
     matrix = (tmp_path / "threats_components.html").read_text()
     assert "status--partially-mitigated" in matrix
+    assert "M-SANITIZE: missing" in matrix
     prop = (tmp_path / "property_sanitizes_input.html").read_text()
     assert "Worker" in prop and "mitigation_M-SANITIZE.html" in prop
 

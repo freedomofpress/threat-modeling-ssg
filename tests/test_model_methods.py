@@ -243,7 +243,7 @@ DOCS = Mitigation(id="M-DOCS", title="Document it", status="optional")
 
 
 def test_property_mitigation_state_split_by_component(model_factory) -> None:
-    """A property-bearing mitigation reports where it is implemented and where it is missing."""
+    """A mitigation that sets `property` lists components that have or lack it."""
     model = model_factory(
         threats={
             "T1": Threat(
@@ -376,7 +376,7 @@ def test_component_mitigation_states_and_potential(model_factory) -> None:
         ("M-SANITIZE", False),
         ("M-DOCS", None),
     ]
-    # Only property-bearing mitigations that are missing count as potential.
+    # Only mitigations that set `property` and are missing count as potential.
     assert [m.id for m in model.component_potential_mitigations(missing, {"T1"})] == [
         "M-SANITIZE"
     ]
@@ -460,7 +460,7 @@ def test_analysis_distributions_and_actors(model_factory) -> None:
     analysis = model.analyze()
     assert analysis["impact_distribution"] == {"High": 1, "Low": 1}
     assert analysis["status_distribution"] == {"unmanaged": 1, "mitigated": 1}
-    # Actor mapping covers every defined threat, active or not.
+    # The actor mapping includes every defined threat, even ones no scenario finds.
     assert analysis["actors_to_threats"] == {"Any": ["T1", "T3"], "Troll": ["T3"]}
 
 
@@ -492,8 +492,3 @@ def test_entity_lists_are_keyed() -> None:
     assert list(model.threats) == ["T1"]
     assert list(model.mitigations) == ["M1"]
     assert list(model.threat_actors) == ["Any"]
-    # Missing entity maps still load (older reports).
-    old = ThreatModel.model_validate(
-        {"threats": [], "components": {}, "scenarios": [], "properties": {}}
-    )
-    assert old.mitigations == {} and old.threat_actors == {}

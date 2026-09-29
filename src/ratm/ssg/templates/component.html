@@ -21,7 +21,7 @@
 
 {% if potential_mitigations %}
 <h2>Potential Mitigations</h2>
-    <p>Mitigations of applicable threats whose property is not set on this component:</p>
+    <p>Mitigations of this component's threats that are missing here:</p>
     <div class="tag-list">
         {% for mit in potential_mitigations %}
         <a href="{{ mit.id | mitigation_href }}" class="tag tag--false" title="{{ mit.title }}">{{ mit.id }} · {{ mit.property | display }}</a>
@@ -51,7 +51,7 @@
             <td>{{ m.status_badge(threat.status) }}</td>
             <td>
                 {% for st in threat_mitigations[threat_id] %}
-                <a href="{{ st.mitigation.id | mitigation_href }}" class="tag {{ 'tag--true' if st.implemented else ('tag--false' if st.implemented is sameas false else 'tag--text') }}" title="{{ st.mitigation.title }}">{{ st.mitigation.id }}</a>
+                {{ m.presence_tag(st.mitigation.id, st.implemented, href=st.mitigation.id | mitigation_href, title=st.mitigation.title) }}
                 {% endfor %}
             </td>
         </tr>
