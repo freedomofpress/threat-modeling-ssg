@@ -5,6 +5,7 @@
 
 {% block content %}
 <h1>Component: {{ comp_name }}</h1>
+{% if component.source %}<p class="threat-id">{{ m.defined_in(config, component.source) }}</p>{% endif %}
 
 <p>{{ component.description }}</p>
 

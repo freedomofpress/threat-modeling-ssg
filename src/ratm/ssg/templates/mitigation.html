@@ -28,7 +28,7 @@
 
 {% block content %}
 <h1>{{ mitigation.title or mitigation.id }} {{ m.mitigation_status(mitigation) }}</h1>
-<p class="threat-id">{{ mitigation.id }} · {{ mitigation.status | capitalize }}: {{ status_descriptions.get(mitigation.status, "") }}</p>
+<p class="threat-id">{{ mitigation.id }} · {{ mitigation.status | capitalize }}: {{ status_descriptions.get(mitigation.status, "") }}{% if mitigation.source %} · {{ m.defined_in(config, mitigation.source) }}{% endif %}</p>
 
 {% if mitigation.description %}<p>{{ mitigation.description }}</p>{% endif %}
 

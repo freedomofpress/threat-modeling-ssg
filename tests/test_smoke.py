@@ -356,3 +356,30 @@ def test_components_and_scenarios_show_open_risk(tmp_path: Path) -> None:
     assert "1 open threat" in scenarios
     scenario = (tmp_path / "scenario_Handle_request.html").read_text()
     assert "1 open threat" in scenario
+
+
+def test_pages_link_to_source(tmp_path: Path) -> None:
+    report = author_model()
+    model = ThreatModel.model_validate(json.loads(json.dumps(report)))
+    config = SiteConfig(github_repo="https://example.org/ratm", github_branch="dev")
+    model.prepare_scenarios(config)
+    render_views(build_env(), tmp_path, {"config": config, "model": model})
+    base = "https://example.org/ratm/blob/dev/tests/test_smoke.py#L"
+    for name in (
+        "threat_T-INPUT.html",
+        "mitigation_M-SANITIZE.html",
+        "component_Web_app.html",
+        "threat_actor_Any.html",
+        "scenario_Handle_request.html",
+    ):
+        assert f'href="{base}' in (tmp_path / name).read_text(), name
+    # Only repository-relative paths reach the pages.
+    here = str(Path(__file__).resolve().parent.parent)
+    for page in tmp_path.glob("*.html"):
+        assert here not in page.read_text(), page.name
+
+
+def test_source_shown_without_repository(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    page = (tmp_path / "threat_T-INPUT.html").read_text()
+    assert "Defined in <code>tests/test_smoke.py:" in page

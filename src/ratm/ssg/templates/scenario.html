@@ -5,7 +5,8 @@
 {% block title %}Scenario: {{ scenario.name }} - Threat Model{% endblock %}
 
 {% block content %}
-<h1>Scenario: {{ scenario.name }} <small>{% if scenario.url and scenario.file %}(<a href="{{ scenario.url }}">{{ scenario.file }}</a>){% endif %}</small></h1>
+<h1>Scenario: {{ scenario.name }}</h1>
+{% if scenario.source %}<p class="threat-id">{{ m.defined_in(config, scenario.source) }}</p>{% endif %}
 
 <p>{{ scenario.description }}</p>
 

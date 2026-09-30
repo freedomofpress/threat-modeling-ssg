@@ -12,7 +12,6 @@
 <section class="scenario-list-item">
     <h2>
         <a href="scenario_{{ slug }}.html">{{ scenario.name }}</a>
-        {% if scenario.url %}<small>(<a href="{{ scenario.url }}">{{ scenario.file }}</a>)</small>{% endif %}
     </h2>
     {% if scenario.description %}<p><small>{{ scenario.description }}</small></p>{% endif %}
     <p>{{ m.open_risk_line(summary) }}</p>

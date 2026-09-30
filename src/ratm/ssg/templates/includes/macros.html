@@ -41,3 +41,8 @@
 {% if summary.open %}<strong>{{ summary.open }} open threat{{ "s" if summary.open != 1 }}</strong>{% if summary.top_risk %}, highest risk {{ risk_value(summary.top_risk) }}{% endif %}{% else %}No open threats{% endif %} · {{ summary.total }} threat{{ "s" if summary.total != 1 }} in all
 {%- endmacro %}
 
+{# "Defined in path:line", linked to the repository when the site knows it. #}
+{% macro defined_in(config, source) -%}
+{% if source %}{% set href = source_url(config, source) %}<span class="defined-in">Defined in {% if href %}<a href="{{ href }}"><code>{{ source.file }}{% if source.line %}:{{ source.line }}{% endif %}</code></a>{% else %}<code>{{ source.file }}{% if source.line %}:{{ source.line }}{% endif %}</code>{% endif %}</span>{% endif %}
+{%- endmacro %}
+
