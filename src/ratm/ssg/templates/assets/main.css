@@ -1083,7 +1083,9 @@ td.prop-cell[class*="status--"] {
     font-size: 0.9em;
 }
 
-.table-scroll {
+/* Horizontal scroll for wide data tables. Unlike .table-scroll, cells still
+   wrap, so long titles don't push the other columns off-screen. */
+.scroll-x {
     overflow-x: auto;
 }
 

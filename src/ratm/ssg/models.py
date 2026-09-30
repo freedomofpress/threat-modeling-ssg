@@ -367,6 +367,42 @@ class ThreatModel(BaseModel):
         ]
         return mitigating, proposing
 
+    def backlog(self) -> list[dict[str, Any]]:
+        """Proposed mitigations, ranked by the highest risk they would reduce.
+
+        Each entry lists the threats naming the mitigation (in place or as a further
+        mitigation) in risk order, the highest risk after mitigations among them, and
+        how many are open. Ties fall back to the open count, then the mitigation id.
+        """
+        rows = []
+        for mid, mit in self.mitigations.items():
+            if mit.status != "proposed":
+                continue
+            mitigating, proposing = self.mitigation_threats(mid)
+            threats = sorted(
+                {tid: t for tid, t in mitigating + proposing}.items(),
+                key=lambda item: item[1].risk_order,
+            )
+            scores = [
+                t.residual_risk_score for _, t in threats if t.residual_risk_score
+            ]
+            rows.append(
+                {
+                    "mitigation": mit,
+                    "threats": threats,
+                    "top_risk": max(scores) if scores else None,
+                    "open_count": sum(t.is_open for _, t in threats),
+                }
+            )
+        rows.sort(
+            key=lambda row: (
+                -(row["top_risk"] or 0),
+                -row["open_count"],
+                scales.natural_key(row["mitigation"].id),
+            )
+        )
+        return rows
+
     def parent_threats(self, threat_id: str) -> list[str]:
         """Return the ids of the threats that list threat_id as a child."""
         if self._parents is None:

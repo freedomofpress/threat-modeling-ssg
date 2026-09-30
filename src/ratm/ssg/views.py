@@ -368,10 +368,35 @@ def mitigations_view(
     model: ThreatModel,
 ) -> dict[str, Any]:
     rows = []
-    for mid in sorted(model.mitigations, key=scales.natural_key):
+    for rank, mid in enumerate(sorted(model.mitigations, key=scales.natural_key)):
         mitigating, proposing = model.mitigation_threats(mid)
-        rows.append((model.mitigations[mid], mitigating, proposing))
-    return {"config": config, "model": model, "rows": rows}
+        rows.append(
+            {
+                "mitigation": model.mitigations[mid],
+                "rank": rank,
+                "mitigating": mitigating,
+                "proposing": proposing,
+            }
+        )
+    return {
+        "config": config,
+        "model": model,
+        "rows": rows,
+        "statuses": [
+            s
+            for s in scales.MITIGATION_STATUSES
+            if any(m.status == s for m in model.mitigations.values())
+        ],
+    }
+
+
+@view("/backlog.html", log="Generating backlog.html...")
+def backlog_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Proposed mitigations, ranked by the highest risk they would reduce."""
+    return {"config": config, "model": model, "rows": model.backlog()}
 
 
 @view(
