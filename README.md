@@ -21,7 +21,7 @@ uv run demo/model.py | uvx ratm
 
 A model is a Python script that uses the `Ratm` builders. `demo/model.py` is a commented example. The script prints a report, and `ratm` turns that report into the site.
 
-**Properties** describe components (`tm.define_properties(...)`). A threat's `requirements` are expressions over them: `prop`, `!prop`, `prop.item`, `a == b`, `a != b`.
+**Properties** describe components (`tm.define_properties(...)`). A threat's `requirements` are expressions over them: `prop`, `!prop`, `prop.item`, `a == b`, `a != b`, and `x | y` when any of several alternatives will do, for example `element_ids.DFD1 | element_ids.DFD2`. A threat applies to a component when all of its requirements hold.
 
 **Threats** (`tm.Threat(id, requirements=[...], ...)`):
 
@@ -38,7 +38,7 @@ A model is a Python script that uses the `Ratm` builders. `demo/model.py` is a c
 | `children` | ids of smaller threats that make up this one |
 | `capec_info`, `comment` | description and details. If `impact` or `likelihood` is not given, the CAPEC severity and likelihood are used instead. CAPEC's five severity levels are mapped onto the three impact levels. |
 
-Risk is impact times likelihood. The status says how the team is handling the threat. Mitigations never remove a threat from the report. It is listed for every component that matches its requirements.
+Risk is impact times likelihood, from 1 to 12: 1–3 is low, 4–6 medium, and 8–12 high. The status says how the team is handling the threat. Unmanaged and partially mitigated threats count as open. Mitigations never remove a threat from the report. It is listed for every component that matches its requirements.
 
 **Mitigations** (`tm.Mitigation(id, title=..., ...)`) have a `description` and a `status` (`implemented`, `optional`, or `proposed`). When a control is a component property, put it in the threat's requirements instead, for example `!encrypts_secrets`, so the threat applies only to components without it.
 
@@ -50,3 +50,27 @@ Generating the report fails with an error naming the problem when:
 - a status is not one of the values above
 - an impact or likelihood is given but is not on its scale
 - two threats, mitigations, or threat actors share an id or name
+
+## The generated site
+
+- **Summary**: counts by status, each linking to the matching threats, and the ten highest open risks.
+- **Threats**: the risk register. Every threat, highest risk after mitigations first, with sorting and filters by status, threat actor, and text. Filters can be preset in the link, for example `threats.html?status=open`.
+- **Backlog**: proposed mitigations, ranked by the risk they would reduce.
+- **Scenarios**, **Mitigations**, **Threat Actors**, and **Components**, each listing threats highest risk first.
+- **How to read this model** explains the statuses and scores.
+- **Model internals** holds the views for people writing the model: the matching rules, the threats × components matrix, and the component properties.
+
+Each threat, mitigation, threat actor, component, and scenario page shows the file and line that defines it.
+
+## Configuration
+
+`ratm` reads an optional `config.toml` from the directory it runs in:
+
+| Key | Meaning |
+|---|---|
+| `title` | the site title |
+| `logo` | path to a logo image |
+| `github_repo` | repository URL. "Defined in" lines link into it |
+| `github_branch` | branch those links use (default `main`) |
+| `hide_components_with_category` | component classes to leave off the Components page, e.g. `["Actor"]` |
+
