@@ -1,9 +1,13 @@
 """End-to-end: author a model, generate the report, load it, and render every view."""
 
+import filecmp
 import html
 import json
+import os
 import re
 import runpy
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,7 +17,8 @@ from ratm.ssg.cli import build_env
 from ratm.ssg.models import SiteConfig, ThreatModel
 from ratm.ssg.utils import render_views
 
-DEMO = Path(__file__).parent.parent / "demo" / "model.py"
+ROOT = Path(__file__).parent.parent
+DEMO = ROOT / "demo" / "model.py"
 
 
 def author_model() -> dict:
@@ -214,6 +219,64 @@ def test_demo_round_trip(tmp_path: Path) -> None:
     model = render(report, tmp_path)
     assert (tmp_path / "mitigations.html").exists()
     assert model.analyze()["status_distribution"]
+
+
+def build_demo_site(out: Path, hash_seed: int) -> None:
+    """Run `demo/model.py | ratm -o out` under a fixed string hash seed."""
+    env = {
+        **os.environ,
+        "PYTHONHASHSEED": str(hash_seed),
+        "PYTHONPATH": os.pathsep.join(
+            filter(None, [str(ROOT / "src"), os.environ.get("PYTHONPATH")])
+        ),
+    }
+    # ratm loads config.toml from the current directory. Run from `out` so a config.toml
+    # wherever the tests run cannot change the build.
+    report = subprocess.run(
+        [sys.executable, str(DEMO)],
+        env=env,
+        cwd=out,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    subprocess.run(
+        [sys.executable, "-c", "from ratm.ssg.cli import main; main()", "-o", "."],
+        input=report,
+        env=env,
+        cwd=out,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+
+def differing_files(a: Path, b: Path) -> list[str]:
+    cmp = filecmp.dircmp(a, b)
+    assert not cmp.left_only and not cmp.right_only
+    _, differ, errors = filecmp.cmpfiles(a, b, cmp.common_files, shallow=False)
+    differ += errors
+    for sub in cmp.common_dirs:
+        differ += [f"{sub}/{name}" for name in differing_files(a / sub, b / sub)]
+    return differ
+
+
+@pytest.mark.skipif(not DEMO.exists(), reason="demo model missing")
+def test_builds_are_reproducible(tmp_path: Path) -> None:
+    # Python randomizes string hashing in each process, and that decides the order in
+    # which a set of strings is iterated. Two builds in this process would always match,
+    # so build in separate processes with different PYTHONHASHSEED values and compare
+    # the output. Without sorting, seeds 0 and 1 reorder the component tables on the
+    # demo's threat pages, and seed 2 reorders a component page's threat table.
+    builds = []
+    for seed in (0, 1, 2):
+        out = tmp_path / f"seed{seed}"
+        out.mkdir()
+        build_demo_site(out, seed)
+        builds.append(out)
+    assert (builds[0] / "threat_RATM-4-EXEC.html").exists()
+    for other in builds[1:]:
+        assert differing_files(builds[0], other) == [], other.name
 
 
 def test_proposed_mitigation_page_lists_components(tmp_path: Path) -> None:
