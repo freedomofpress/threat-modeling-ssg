@@ -3,9 +3,51 @@ import dataclasses
 import functools
 import hashlib
 import pathlib
+import sys
 from dataclasses import dataclass
 
 from . import scales
+
+_PACKAGE_DIR = pathlib.Path(__file__).resolve().parent
+
+
+@functools.cache
+def _repo_root(directory: pathlib.Path) -> pathlib.Path | None:
+    """The nearest directory at or above `directory` that contains .git.
+
+    Uses exists(), not is_dir(), because .git is a file in a git worktree."""
+    for candidate in (directory, *directory.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _caller_source() -> tuple[str, int] | None:
+    """Where the model code that is creating an object lives, as (path, line), so the
+    generated report can show “Defined in demo/model.py:42” and link back to that line.
+
+    Steps up the call stack, past ratm's own code and the __init__ code that dataclasses
+    generate, to the first caller outside ratm. The path is relative to the git
+    checkout, or to the working directory, so no absolute path reaches the published
+    site.
+    """
+    frame = sys._getframe(1)
+    while frame is not None:
+        filename = frame.f_code.co_filename
+        if not filename.startswith("<"):
+            path = pathlib.Path(filename).resolve()
+            if _PACKAGE_DIR not in path.parents:
+                root = _repo_root(path.parent)
+                if root is None and pathlib.Path.cwd() in path.parents:
+                    root = pathlib.Path.cwd()
+                relative = path.relative_to(root).as_posix() if root else path.name
+                return relative, frame.f_lineno
+        frame = frame.f_back
+    return None
+
+
+def _source_dict(source: tuple[str, int] | None) -> dict | None:
+    return {"file": source[0], "line": source[1]} if source else None
 
 
 @functools.cache
@@ -107,6 +149,11 @@ class Component:
     boundary: "Boundary" = None
     properties: ComponentProperties = None
     type: str = "Component"
+    source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+
+    def __post_init__(self):
+        if self.source is None:
+            self.source = _caller_source()
 
     def with_properties(
         self, component_properties_cls=ComponentProperties, **properties
@@ -148,6 +195,7 @@ class Component:
             "in_boundary": self.boundary.name if self.boundary else None,
             "name": self.name,
             "properties": self.combined_properties.to_nondefault_dict(),
+            "source": _source_dict(self.source),
         }
 
 
@@ -258,12 +306,19 @@ class Mitigation:
     description: str = None
     status: str = scales.DEFAULT_MITIGATION_STATUS
 
+    source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+
+    def __post_init__(self):
+        if self.source is None:
+            self.source = _caller_source()
+
     def to_dict(self):
         return {
             "id": self.id,
             "title": self.title,
             "description": self.description or "",
             "status": self.status,
+            "source": _source_dict(self.source),
         }
 
 
@@ -273,9 +328,18 @@ class ThreatActor:
 
     name: str
     description: str = None
+    source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+
+    def __post_init__(self):
+        if self.source is None:
+            self.source = _caller_source()
 
     def to_dict(self):
-        return {"name": self.name, "description": self.description or ""}
+        return {
+            "name": self.name,
+            "description": self.description or "",
+            "source": _source_dict(self.source),
+        }
 
 
 @dataclass
@@ -296,6 +360,11 @@ class Threat:
     further_mitigations: list[str] = dataclasses.field(default_factory=list)
     children: list[str] = dataclasses.field(default_factory=list)
     threat_actors: list[str] = dataclasses.field(default_factory=list)
+    source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+
+    def __post_init__(self):
+        if self.source is None:
+            self.source = _caller_source()
 
     @property
     def impact_label(self):
@@ -370,6 +439,7 @@ class Threat:
         info["mapping"]["requirements"] = self.requirements
         info["mapping"]["mitigations"] = list(self.mitigations)
         info["mapping"]["further_mitigations"] = list(self.further_mitigations)
+        info["source"] = _source_dict(self.source)
         return info
 
 
@@ -389,6 +459,11 @@ class Scenario:
     dataflows: list[Dataflow] | None = None
     description: str = None
     findings: list[Finding] | None = None
+    source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+
+    def __post_init__(self):
+        if self.source is None:
+            self.source = _caller_source()
 
     def copy_from_label(self, label, name, description=None):
         new_flows = []
@@ -420,7 +495,8 @@ class Scenario:
     def to_dict(self):
         return {
             # FIXME: Improve this dictionary
-            "file": "",
+            "file": self.source[0] if self.source else "",
+            "line": self.source[1] if self.source else None,
             "description": self.description or "",
             "name": self.name,
             "flows": [f.to_dict() for f in self.dataflows],

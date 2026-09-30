@@ -1237,3 +1237,7 @@ table[data-sortable] th[aria-sort="descending"] button::after { content: " \25BC
     font-weight: bold;
 }
 
+.defined-in code {
+    font-size: 0.95em;
+}
+

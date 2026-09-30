@@ -5,6 +5,7 @@
 
 {% block content %}
 <h1>Threat actor: {{ actor.name }}</h1>
+{% if actor.source %}<p class="threat-id">{{ m.defined_in(config, actor.source) }}</p>{% endif %}
 
 {% if actor.description %}<p>{{ actor.description }}</p>{% endif %}
 

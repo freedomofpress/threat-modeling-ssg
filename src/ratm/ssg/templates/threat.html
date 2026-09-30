@@ -12,6 +12,7 @@
 <p class="threat-id">
     {% if threat.is_capec %}<a href="https://capec.mitre.org/data/definitions/{{ threat_id.replace('CAPEC-', '') }}.html">{{ threat_id }}</a>{% else %}{{ threat_id }}{% endif %}
     · {{ threat.status | capitalize }}: {{ status_descriptions.get(threat.status, "") }}
+    {% if threat.source %}· {{ m.defined_in(config, threat.source) }}{% endif %}
 </p>
 
 <dl class="risk-line">
