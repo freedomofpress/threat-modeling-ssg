@@ -249,36 +249,14 @@ class CAPECInfo:
         return {k: v if v else "" for k, v in info.items()}
 
 
-def _token_property_names(token: str) -> list[str]:
-    """Return the property names used in a requirement or mitigation expression."""
-    token = token.strip()
-    for operator in ("!=", "=="):
-        if operator in token:
-            left, right = token.split(operator, 1)
-            return [left.strip(), right.strip()]
-    return [token.removeprefix("!").split(".", 1)[0]]
-
-
 @dataclass
 class Mitigation:
-    """A control that reduces one or more threats.
-
-    The report always shows the mitigation's status. If `property` names a component
-    property, the report also checks each affected component for it.
-    """
+    """A control that reduces one or more threats."""
 
     id: str
     title: str
     description: str = None
     status: str = scales.DEFAULT_MITIGATION_STATUS
-
-    @property
-    def property_names(self):
-        return _token_property_names(self.property) if self.property else []
-
-    # This field must come after the methods above. A class attribute named `property`
-    # hides Python's built-in @property decorator for the rest of the class body.
-    property: str = None
 
     def to_dict(self):
         return {
@@ -286,7 +264,6 @@ class Mitigation:
             "title": self.title,
             "description": self.description or "",
             "status": self.status,
-            "property": self.property,
         }
 
 

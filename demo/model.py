@@ -38,31 +38,29 @@ tm.define_properties(
 # -- Mitigations
 #
 # Each mitigation is its own object with an id, a title, and a status: "implemented",
-# "optional", or "proposed". The report shows every mitigation's status. `property`
-# optionally names a component property. When it is set, the report also checks each
-# affected component for that property.
+# "optional", or "proposed".
+#
+# When a control is a component property, put it in the threat's requirements instead,
+# as RATM-3-SECRETS does with "!encrypts_secrets". The threat then applies only to
+# components without the control.
 
 tm.Mitigation(
     "MIT-VERIFY-DEPS",
     title="Pin and hash-check dependencies",
     description="Lockfiles with hashes make the registry unable to swap a package.",
-    property="verifies_resources.deps",
 )
 tm.Mitigation(
     "MIT-STRONG-CREDS",
     title="Hardware-backed or short-lived credentials",
-    property="uses_strong_credentials",
 )
 tm.Mitigation(
     "MIT-ENCRYPT-SECRETS",
     title="Encrypt tokens at rest",
-    property="encrypts_secrets",
     status="proposed",
 )
 tm.Mitigation(
     "MIT-VERIFY-SOURCE",
     title="Verify the origin of executed code",
-    property="verifies_resources.source",
     status="proposed",
 )
 tm.Mitigation(

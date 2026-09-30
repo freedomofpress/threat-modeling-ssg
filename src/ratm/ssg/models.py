@@ -1,5 +1,4 @@
 from collections import Counter, defaultdict
-from collections.abc import Iterable
 from typing import Any, TextIO
 
 from pydantic import (
@@ -40,26 +39,6 @@ class Mitigation(BaseModel):
     title: str = ""
     description: str = ""
     status: str = scales.DEFAULT_MITIGATION_STATUS
-
-    @property
-    def property_names(self) -> list[str]:
-        return _token_props(self.property) if self.property else []
-
-    # This field must come after the methods above. A class attribute named `property`
-    # hides Python's built-in @property decorator for the rest of the class body.
-    property: str | None = None
-
-    def refers_to_prop(self, prop_key: str) -> bool:
-        return prop_key in self.property_names
-
-    def implemented_on(self, component: "Component") -> bool | None:
-        """Return whether the component has the property.
-
-        Return None if `property` is not set.
-        """
-        if not self.property:
-            return None
-        return _token_satisfied(component, self.property)
 
 
 class ThreatActor(BaseModel):
@@ -350,91 +329,6 @@ class ThreatModel(BaseModel):
             if mitigation_id in t.mapping.further_mitigations
         ]
         return mitigating, proposing
-
-    def component_mitigation_states(
-        self, component: Component, threat: Threat
-    ) -> list[dict[str, Any]]:
-        """Return each of the threat's mitigations and whether the component has it.
-
-        The state is None for mitigations that do not set `property`.
-        """
-        return [
-            {"mitigation": mit, "implemented": mit.implemented_on(component)}
-            for mit in self.threat_mitigations(threat)
-        ]
-
-    def component_potential_mitigations(
-        self, component: Component, threat_ids: Iterable[str]
-    ) -> list[Mitigation]:
-        """Return the mitigations of those threats that the component lacks.
-
-        Only mitigations that set `property` can be checked, so only they count.
-        """
-        potential: dict[str, Mitigation] = {}
-        for tid in threat_ids:
-            threat = self.threats.get(tid)
-            if not threat:
-                continue
-            candidates = self.threat_mitigations(threat) + self.threat_mitigations(
-                threat, further=True
-            )
-            for mit in candidates:
-                if mit.implemented_on(component) is False:
-                    potential[mit.id] = mit
-        return [potential[mid] for mid in sorted(potential)]
-
-    def property_mitigation_state(self, prop_key: str) -> list[dict[str, Any]]:
-        """Describe each mitigation whose `property` uses prop_key.
-
-        Each entry lists the threats that appear in a scenario and name the mitigation,
-        either as in place or as a further mitigation, and the components those threats
-        affect that have or lack the property.
-        """
-        analysis = self.analyze()
-        states = []
-        for mid in sorted(self.mitigations):
-            mit = self.mitigations[mid]
-            if not mit.refers_to_prop(prop_key):
-                continue
-            active = [
-                (tid, self.threats[tid])
-                for tid in sorted(analysis["threat_counter"])
-                if tid in self.threats
-            ]
-            threats = [(tid, t) for tid, t in active if mid in t.mapping.mitigations]
-            proposed_for = [
-                (tid, t) for tid, t in active if mid in t.mapping.further_mitigations
-            ]
-            affected = self.affected_components(threats + proposed_for)
-            implemented_on, missing_on = [], []
-            for name in affected:
-                comp = self.components.get(name)
-                if comp is None:
-                    continue
-                (implemented_on if mit.implemented_on(comp) else missing_on).append(
-                    (name, comp)
-                )
-            states.append(
-                {
-                    "mitigation": mit,
-                    "threats": threats,
-                    "proposed_for": proposed_for,
-                    "implemented_on": implemented_on,
-                    "missing_on": missing_on,
-                }
-            )
-        return states
-
-    def affected_components(self, threats: list[tuple[str, Threat]]) -> list[str]:
-        """Return the sorted names of the components any of these threats affect."""
-        analysis = self.analyze()
-        return sorted(
-            {
-                name
-                for tid, _ in threats
-                for name in analysis["threats_to_components"].get(tid, set())
-            }
-        )
 
     def parent_threats(self, threat_id: str) -> list[str]:
         """Return the ids of the threats that list threat_id as a child."""

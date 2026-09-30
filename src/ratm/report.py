@@ -50,22 +50,12 @@ class Report:
         threat_ids = _unique_ids("threat", [t.id for t in self.threats])
         mitigation_ids = _unique_ids("mitigation", [m.id for m in self.mitigations])
         actor_names = _unique_ids("threat actor", [a.name for a in self.threat_actors])
-        property_names = {prop.name for prop in self.properties}
 
         for mit in self.mitigations:
             if mit.status not in scales.MITIGATION_STATUSES:
                 raise ValueError(
                     f"Mitigation {mit.id} has unknown status '{mit.status}'"
                 )
-            # With no properties defined there is nothing to check against, and a report
-            # built from scenarios alone should still generate.
-            if property_names:
-                for name in mit.property_names:
-                    if name not in property_names:
-                        raise ValueError(
-                            f"Mitigation {mit.id} property '{mit.property}' refers"
-                            f" to undefined property '{name}'"
-                        )
 
         for threat in self.threats:
             prefix = f"Threat {threat.id}"

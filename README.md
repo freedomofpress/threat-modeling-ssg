@@ -40,7 +40,7 @@ A model is a Python script that uses the `Ratm` builders. `demo/model.py` is a c
 
 Risk is impact times likelihood. The status says how the team is handling the threat. Mitigations never remove a threat from the report. It is listed for every component that matches its requirements.
 
-**Mitigations** (`tm.Mitigation(id, title=..., ...)`) have a `description`, a `status` (`implemented`, `optional`, or `proposed`), and an optional `property` expression. The report always shows a mitigation's status. When `property` is set, the report also checks each affected component for that property and marks the mitigation as in place or missing there.
+**Mitigations** (`tm.Mitigation(id, title=..., ...)`) have a `description` and a `status` (`implemented`, `optional`, or `proposed`). When a control is a component property, put it in the threat's requirements instead, for example `!encrypts_secrets`, so the threat applies only to components without it.
 
 **Threat actors** (`tm.ThreatActor(name, description=...)`) must be registered before a threat can name them.
 
@@ -49,5 +49,4 @@ Generating the report fails with an error naming the problem when:
 - a threat names an unknown mitigation, threat actor, or child threat, or lists itself as a child
 - a status is not one of the values above
 - an impact or likelihood is given but is not on its scale
-- a mitigation's `property` uses a property the model does not define. This check only runs when the model defines at least one property.
 - two threats, mitigations, or threat actors share an id or name

@@ -85,16 +85,6 @@ def threat_view(
                     "highlighted_dfd": highlighted_dfd,
                 }
             )
-        mitigations = []
-        for mit in model.threat_mitigations(threat):
-            per_component = None
-            if mit.property:
-                per_component = [
-                    (name, mit.implemented_on(model.components[name]))
-                    for name in affected_components
-                    if name in model.components
-                ]
-            mitigations.append({"mitigation": mit, "per_component": per_component})
         yield {
             "config": config,
             "model": model,
@@ -104,7 +94,7 @@ def threat_view(
             "scenarios": scenario_names,
             "frequency": analysis["threat_counter"].get(threat_id, 0),
             "threat_scenario_data": threat_scenario_data,
-            "mitigations": mitigations,
+            "mitigations": model.threat_mitigations(threat),
             "further_mitigations": model.threat_mitigations(threat, further=True),
             "children": [(cid, model.threats.get(cid)) for cid in threat.children],
             "parents": [
@@ -139,14 +129,6 @@ def component_view(
             "component": component,
             "threats": threat_ids,
             "scenarios": scenario_names,
-            "potential_mitigations": model.component_potential_mitigations(
-                component, threat_ids
-            ),
-            "threat_mitigations": {
-                tid: model.component_mitigation_states(component, model.threats[tid])
-                for tid in threat_ids
-                if tid in model.threats
-            },
             "component_name": slugify(name),
         }
 
@@ -219,7 +201,6 @@ def property_view(
                 "label": prop.name,
                 "display_label": display_token(prop_key).title(),
                 "slug": slug,
-                "mitigation_states": model.property_mitigation_state(prop_key),
                 "requiring_threats": requiring_threats,
             },
         }
@@ -284,20 +265,16 @@ def threats_components_view(
     )
 
     affected: dict[str, Component] = {}
-    status: dict[str, dict[str, dict]] = {}
+    # Names of the components each threat applies to. A cell is filled when the
+    # component is in its threat's set.
+    applies: dict[str, set[str]] = {}
     for tid, threat in active_threats:
-        status[tid] = {}
+        applies[tid] = set()
         for comp_name, comp in model.components.items():
             if not threat.applies_to(comp):
                 continue
             affected[comp_name] = comp
-            status[tid][comp_name] = {
-                "states": [
-                    st
-                    for st in model.component_mitigation_states(comp, threat)
-                    if st["implemented"] is not None
-                ],
-            }
+            applies[tid].add(comp_name)
 
     sorted_components = sorted(
         affected.items(), key=lambda x: (x[1].component_class, x[0])
@@ -316,7 +293,7 @@ def threats_components_view(
         "component_classes": Counter(
             comp.component_class or "Other" for _, comp in sorted_components
         ),
-        "status": status,
+        "applies": applies,
     }
 
 
@@ -343,18 +320,6 @@ def mitigation_view(
 ) -> Iterable[dict[str, Any]]:
     for mid, mitigation in model.mitigations.items():
         mitigating, proposing = model.mitigation_threats(mid)
-        component_states = None
-        if mitigation.property:
-            affected = model.affected_components(mitigating + proposing)
-            component_states = [
-                (
-                    name,
-                    model.components[name],
-                    mitigation.implemented_on(model.components[name]),
-                )
-                for name in affected
-                if name in model.components
-            ]
         yield {
             "config": config,
             "model": model,
@@ -362,7 +327,6 @@ def mitigation_view(
             "mitigation": mitigation,
             "threats": mitigating,
             "further_threats": proposing,
-            "component_states": component_states,
         }
 
 
