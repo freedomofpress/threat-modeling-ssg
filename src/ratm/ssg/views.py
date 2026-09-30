@@ -151,7 +151,7 @@ def threat_view(
             "threat": threat,
             "components": affected_components,
             "scenarios": scenario_names,
-            "frequency": analysis["threat_counter"].get(threat_id, 0),
+            "status_descriptions": scales.THREAT_STATUSES,
             "threat_scenario_data": threat_scenario_data,
             "mitigations": model.threat_mitigations(threat),
             "further_mitigations": model.threat_mitigations(threat, further=True),
