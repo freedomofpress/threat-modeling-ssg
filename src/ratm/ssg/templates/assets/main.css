@@ -1215,3 +1215,23 @@ table[data-sortable] th[aria-sort="descending"] button::after { content: " \25BC
     color: var(--color-text-dim);
 }
 
+.footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+}
+
+/* Guide: the impact x likelihood grid. */
+.risk-grid td,
+.risk-grid th {
+    text-align: center;
+}
+
+.risk-cell {
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.risk-cell--high {
+    font-weight: bold;
+}
+

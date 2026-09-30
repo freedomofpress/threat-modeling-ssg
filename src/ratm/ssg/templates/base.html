@@ -42,7 +42,10 @@
             {% block content %}{% endblock %}
         </div>
         <footer>
-            <nav class="footer-nav"><a href="internals.html"{% if active_page | default('') == "internals.html" %} class="nav-active"{% endif %}>Model internals</a></nav>
+            <nav class="footer-nav">
+                <a href="guide.html"{% if active_page | default('') == "guide.html" %} class="nav-active"{% endif %}>How to read this model</a>
+                <a href="internals.html"{% if active_page | default('') == "internals.html" %} class="nav-active"{% endif %}>Model internals</a>
+            </nav>
             Thanks to <a href="https://lospec.com/palette-list/slso8">Luis Miguel Maldonado</a> for the colors!
         </footer>
     </div>
