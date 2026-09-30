@@ -1164,3 +1164,50 @@ table[data-sortable] th[aria-sort="descending"] button::after { content: " \25BC
     margin-bottom: 4px;
 }
 
+/* Threat page: title, id, and the risk line lead the page. */
+.threat-title {
+    margin-bottom: 4px;
+}
+
+.threat-id {
+    margin-top: 0;
+    font-size: 0.9em;
+    color: var(--color-text-dim);
+}
+
+.risk-line {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px 16px;
+    margin: 16px 0 4px;
+    padding: 12px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 1.1em;
+}
+
+.risk-line dt {
+    color: var(--color-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.8em;
+    align-self: center;
+}
+
+.risk-line dd {
+    margin: 0;
+}
+
+.small {
+    font-size: 0.85em;
+}
+
+.threat-matching {
+    margin-top: 32px;
+}
+
+.threat-matching summary {
+    cursor: pointer;
+    color: var(--color-text-dim);
+}
+
