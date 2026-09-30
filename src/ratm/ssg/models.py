@@ -208,6 +208,9 @@ class Property(BaseModel):
 
 def _token_props(token: str) -> list[str]:
     """The property names a requirement/mitigation token refers to."""
+    if "|" in token:
+        names = [name for part in token.split("|") for name in _token_props(part)]
+        return list(dict.fromkeys(names))
     token = token.strip()
     for operator in ("!=", "=="):
         if operator in token:
@@ -221,7 +224,10 @@ def _token_satisfied(component: Component, token: str) -> bool:
 
     Mirrors ComponentProperties.matches() on the report side: negation ('!is_exposed'),
     comparison ('requires_credentials != uses_strong_credentials'), sub-resources
-    ('verifies_resources.deps') and plain truthiness ('is_physical')."""
+    ('verifies_resources.deps'), plain truthiness ('is_physical') and any-of
+    ('element_ids.DFD1 | element_ids.DFD2'), which is split first."""
+    if "|" in token:
+        return any(_token_satisfied(component, part) for part in token.split("|"))
     token = token.strip()
     if token.startswith("!"):
         return not _token_satisfied(component, token[1:])

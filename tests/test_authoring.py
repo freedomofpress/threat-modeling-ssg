@@ -1,10 +1,13 @@
 """Tests for the model code: the Ratm builders, Threat, Mitigation, and Report."""
 
 import inspect
+import json
 
 import pytest
 
 from ratm import CAPECInfo, Mitigation, Ratm, Report, Scenario, Threat, ThreatActor
+from ratm.ssg.models import Component as SiteComponent
+from ratm.ssg.models import _token_props, _token_satisfied
 
 
 @pytest.fixture()
@@ -258,3 +261,54 @@ def test_source_is_the_model_code_that_called_a_helper(tm: Ratm) -> None:
     # The source is the call inside the helper, not a line inside ratm.
     assert threat.source[0] == "tests/test_authoring.py"
     assert threat.source[1] == register.__code__.co_firstlineno + 1
+
+
+# -- "Any of" requirements
+
+
+@pytest.mark.parametrize(
+    ("token", "expected"),
+    [
+        ("reads_input | sanitizes_input", True),
+        ("sanitizes_input | reads_input", True),
+        ("sanitizes_input | is_exposed", False),
+        ("sanitizes_input|reads_input", True),
+        ("loads_resources.images | loads_resources.deps", True),
+        ("loads_resources.images | verifies_resources.images", False),
+        ("!reads_input | is_exposed", False),
+        ("!sanitizes_input | is_exposed", True),
+        ("reads_input == is_exposed | reads_input", True),
+    ],
+)
+def test_any_of_requirements_agree_across_layers(token, expected) -> None:
+    """The model code decides findings and the site re-checks tokens, so the two must agree."""
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties(
+        "reads_input",
+        "sanitizes_input",
+        "is_exposed",
+        ("loads_resources", "Loads resources", (), tuple),
+        ("verifies_resources", "Verifies resources", (), tuple),
+    )
+    comp = tm.Component(name="C", reads_input=True, loads_resources=("deps",))
+    assert bool(comp.matches(token)) is expected
+    # Go through JSON, as a real report does, so tuples become lists.
+    properties = json.loads(json.dumps(comp.to_dict()["properties"]))
+    site_comp = SiteComponent(name="C", properties=properties)
+    assert _token_satisfied(site_comp, token) is expected
+
+
+def test_any_of_threat_applies_to_either_component() -> None:
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties(("element_ids", "Legacy ids", (), tuple))
+    tm.Threat("T1", requirements=["element_ids.DFD1 | element_ids.DFD2"])
+    a = tm.Component(name="A", element_ids=("DFD1",))
+    b = tm.Component(name="B", element_ids=("DFD2",))
+    c = tm.Component(name="C", element_ids=("DFD3",))
+    scenario = Scenario(name="S")
+    scenario.Dataflow(name="A to B", source=a, sink=b)
+    scenario.Dataflow(name="B to C", source=b, sink=c)
+    report = tm.Report([scenario]).generate()
+    targets = sorted(f["target"] for f in report["scenarios"][0]["findings"])
+    assert targets == ["A", "B"]
+    assert _token_props("element_ids.DFD1 | !other") == ["element_ids", "other"]

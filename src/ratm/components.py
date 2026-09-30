@@ -111,6 +111,12 @@ class ComponentProperties:
         return getattr(self, prop_left.strip()) == getattr(self, prop_right.strip())
 
     def matches(self, expr: str):
+        # "a | b" matches when either side does. Split on "|" before anything else, so
+        # each side can use the other operators.
+        if "|" in expr:
+            return any(self.matches(part) for part in expr.split("|"))
+
+        expr = expr.strip()
         if expr.startswith("!"):
             # Check if the component property is missing, False, or empty list.
             prop = expr.removeprefix("!")
