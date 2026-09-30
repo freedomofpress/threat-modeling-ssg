@@ -24,26 +24,21 @@
 <table>
     <thead>
         <tr>
-            <th>Threat ID</th>
-            <th>Name</th>
-            <th>Description</th>
+            <th>Threat</th>
             <th>Status</th>
+            <th>Risk</th>
+            <th>After mitigations</th>
             <th>Mitigations</th>
         </tr>
     </thead>
     <tbody>
-        {% for threat_id in threats %}
-        {% set threat = model.threats[threat_id] %}
+        {% for threat_id, threat in threats %}
         <tr>
-            <td><a href="threat_{{ threat_id }}.html">{{ threat_id }}</a></td>
-            <td>{{ threat.description }}</td>
-            <td>{{ threat.details }}</td>
+            <td>{{ m.threat_link(threat_id, threat) }}</td>
             <td>{{ m.status_badge(threat.status) }}</td>
-            <td>
-                {% for mit in model.threat_mitigations(threat) %}
-                <a href="{{ mit.id | mitigation_href }}" class="tag tag--text" title="{{ mit.title }}">{{ mit.id }}</a>
-                {% endfor %}
-            </td>
+            <td>{{ m.risk_value(threat.risk_score) }}</td>
+            <td>{{ m.risk_value(threat.residual_risk_score) }}</td>
+            <td class="register-list">{{ m.mitigation_list(model.threat_mitigations(threat)) }}</td>
         </tr>
         {% endfor %}
     </tbody>

@@ -13,23 +13,23 @@
 <table>
     <thead>
         <tr>
-            <th>Threat ID</th>
-            <th>Description</th>
+            <th>Threat</th>
             <th>Status</th>
             <th>Impact</th>
             <th>Likelihood</th>
             <th>Risk</th>
+            <th>After mitigations</th>
         </tr>
     </thead>
     <tbody>
         {% for tid, threat in threats %}
         <tr>
-            <td><a href="threat_{{ tid }}.html">{{ tid }}</a></td>
-            <td>{{ threat.description }}</td>
+            <td>{{ m.threat_link(tid, threat) }}</td>
             <td>{{ m.status_badge(threat.status) }}</td>
             <td>{{ threat.impact_label }}</td>
             <td>{{ threat.likelihood_label }}</td>
-            <td>{{ m.risk(threat) }}</td>
+            <td>{{ m.risk_value(threat.risk_score) }}</td>
+            <td>{{ m.risk_value(threat.residual_risk_score) }}</td>
         </tr>
         {% endfor %}
     </tbody>

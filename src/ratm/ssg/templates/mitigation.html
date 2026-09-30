@@ -1,25 +1,25 @@
 {% extends "base.html" %}
 {% import "includes/macros.html" as m %}
 {% set active_page = "mitigations.html" %}
-{% block title %}{{ mitigation.id }}: {{ mitigation.title }} - Threat Model{% endblock %}
+{% block title %}{{ mitigation.title or mitigation.id }} - Threat Model{% endblock %}
 
 {% macro threat_rows(threats) %}
 <table>
     <thead>
         <tr>
-            <th>Threat ID</th>
-            <th>Description</th>
+            <th>Threat</th>
             <th>Status</th>
             <th>Risk</th>
+            <th>After mitigations</th>
         </tr>
     </thead>
     <tbody>
         {% for tid, threat in threats %}
         <tr>
-            <td><a href="threat_{{ tid }}.html">{{ tid }}</a></td>
-            <td>{{ threat.description }}</td>
+            <td>{{ m.threat_link(tid, threat) }}</td>
             <td>{{ m.status_badge(threat.status) }}</td>
-            <td>{{ m.risk(threat) }}</td>
+            <td>{{ m.risk_value(threat.risk_score) }}</td>
+            <td>{{ m.risk_value(threat.residual_risk_score) }}</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -27,7 +27,8 @@
 {% endmacro %}
 
 {% block content %}
-<h1>{{ mitigation.id }}: {{ mitigation.title }} {{ m.mitigation_status(mitigation) }}</h1>
+<h1>{{ mitigation.title or mitigation.id }} {{ m.mitigation_status(mitigation) }}</h1>
+<p class="threat-id">{{ mitigation.id }} · {{ mitigation.status | capitalize }}: {{ status_descriptions.get(mitigation.status, "") }}</p>
 
 {% if mitigation.description %}<p>{{ mitigation.description }}</p>{% endif %}
 

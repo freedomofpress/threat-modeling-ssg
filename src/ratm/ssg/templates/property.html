@@ -13,9 +13,8 @@
     {% for tid, threat in data.requiring_threats %}
     {% set tokens = threat.mapping.requirements_for_prop(prop) %}
     <li>
-        <a href="threat_{{ tid }}.html">{{ tid }}</a>
+        {{ m.threat_link(tid, threat) }}
         {% if tokens and tokens != [prop] %}<code class="prop-token">{{ tokens | join(', ') }}</code>{% endif %}
-        <span class="prop-meta">{{ threat.description }}</span>
         {{ m.status_badge(threat.status) }}
     </li>
     {% endfor %}

@@ -1,28 +1,26 @@
 {% import "includes/macros.html" as m %}
-{% if scenario.findings %}
+{% if findings %}
 <table>
     <thead>
         <tr>
-            <th>Threat ID</th>
-            <th>Description</th>
-            <th>Target Component</th>
+            <th>Threat</th>
+            <th>Component</th>
             <th>Status</th>
+            <th>Risk</th>
+            <th>After mitigations</th>
             <th>Mitigations</th>
         </tr>
     </thead>
     <tbody>
-        {% for finding in scenario.findings %}
-        {% set threat = model.threats[finding.threat_id] %}
+        {% for finding in findings %}
+        {% set threat = finding.threat %}
         <tr>
-            <td><a href="threat_{{ finding.threat_id }}.html">{{ finding.threat_id }}</a></td>
-            <td>{{ threat.description }}</td>
+            <td>{{ m.threat_link(finding.tid, threat) }}</td>
             <td><a href="component_{{ finding.target | slugify }}.html">{{ finding.target }}</a></td>
             <td>{{ m.status_badge(threat.status) }}</td>
-            <td>
-                {% for mit in model.threat_mitigations(threat) %}
-                <a href="{{ mit.id | mitigation_href }}" class="tag tag--text" title="{{ mit.title }}">{{ mit.id }}</a>
-                {% endfor %}
-            </td>
+            <td>{{ m.risk_value(threat.risk_score) }}</td>
+            <td>{{ m.risk_value(threat.residual_risk_score) }}</td>
+            <td class="register-list">{{ m.mitigation_list(model.threat_mitigations(threat)) }}</td>
         </tr>
         {% endfor %}
     </tbody>

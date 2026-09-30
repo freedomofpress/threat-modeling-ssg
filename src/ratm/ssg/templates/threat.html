@@ -42,7 +42,6 @@
 <table>
     <thead>
         <tr>
-            <th>ID</th>
             <th>Mitigation</th>
             <th>Status</th>
         </tr>
@@ -51,7 +50,6 @@
         {% for mit in mitigations %}
         <tr>
             <td>{{ m.mitigation_link(mit) }}</td>
-            <td>{{ mit.title }}</td>
             <td>{{ m.mitigation_status(mit) }}</td>
         </tr>
         {% endfor %}
@@ -65,7 +63,7 @@
 <h2>Possible further mitigations</h2>
 <ul class="prop-list">
     {% for mit in further_mitigations %}
-    <li>{{ m.mitigation_link(mit) }} <span class="prop-meta">{{ mit.title }}</span> {{ m.mitigation_status(mit) }}</li>
+    <li>{{ m.mitigation_link(mit) }} {{ m.mitigation_status(mit) }}</li>
     {% endfor %}
 </ul>
 {% endif %}
@@ -80,7 +78,7 @@
 {% if parents %}
 <p>This threat is part of:
     {% for pid, parent in parents %}
-    <a href="threat_{{ pid }}.html">{{ pid }}</a>{% if parent %} ({{ parent.description }}){% endif %}{% if not loop.last %}, {% endif %}
+    {{ m.threat_link(pid, parent) }}{% if not loop.last %}, {% endif %}
     {% endfor %}
 </p>
 {% endif %}
@@ -88,7 +86,7 @@
 <p>Smaller threats that make up this one:</p>
 <ul class="prop-list">
     {% for cid, child in children %}
-    <li><a href="threat_{{ cid }}.html">{{ cid }}</a>{% if child %} <span class="prop-meta">{{ child.description }}</span> {{ m.status_badge(child.status) }}{% endif %}</li>
+    <li>{{ m.threat_link(cid, child) }}{% if child %} {{ m.status_badge(child.status) }}{% endif %}</li>
     {% endfor %}
 </ul>
 {% endif %}
