@@ -7,50 +7,6 @@
 {% block content %}
 <h1>Property: {{ display_label }}</h1>
 
-<h2>Mitigations checked with this property</h2>
-{% if data.mitigation_states %}
-{% for state in data.mitigation_states %}
-<h3>{{ m.mitigation_link(state.mitigation) }} · {{ state.mitigation.title }} {{ m.mitigation_status(state.mitigation) }}</h3>
-{% if state.mitigation.property != prop %}<p><code class="prop-token">{{ state.mitigation.property }}</code></p>{% endif %}
-{% if state.threats or state.proposed_for %}
-{% if state.threats %}
-<p>Threats it mitigates:
-    {% for tid, threat in state.threats %}
-    <a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}
-    {% endfor %}
-</p>
-{% endif %}
-{% if state.proposed_for %}
-<p>Possible further mitigation for:
-    {% for tid, threat in state.proposed_for %}
-    <a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}
-    {% endfor %}
-</p>
-{% endif %}
-{% else %}
-<p><em>No threat found in any scenario lists this mitigation.</em></p>
-{% endif %}
-<ul class="prop-list">
-    {% for name, comp in state.implemented_on %}
-    <li>
-        <a href="component_{{ name | slugify }}.html">{{ name }}</a>
-        <span class="prop-meta">{{ comp.component_class }}{% if comp.inBoundary %} · {{ comp.inBoundary }}{% endif %}</span>
-        <span class="badge badge-true">in place</span>
-    </li>
-    {% endfor %}
-    {% for name, comp in state.missing_on %}
-    <li>
-        <a href="component_{{ name | slugify }}.html">{{ name }}</a>
-        <span class="prop-meta">{{ comp.component_class }}{% if comp.inBoundary %} · {{ comp.inBoundary }}{% endif %}</span>
-        <span class="badge badge-false">missing</span>
-    </li>
-    {% endfor %}
-</ul>
-{% endfor %}
-{% else %}
-<p><em>None.</em></p>
-{% endif %}
-
 <h2>Threats requiring this property</h2>
 {% if data.requiring_threats %}
 <ul class="prop-list">

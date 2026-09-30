@@ -33,9 +33,8 @@ def author_model() -> dict:
     tm.Mitigation(
         "M-SANITIZE",
         title="Sanitize input",
-        property="sanitizes_input",
     )
-    tm.Mitigation("M-VERIFY", title="Verify deps", property="verifies_resources.deps")
+    tm.Mitigation("M-VERIFY", title="Verify deps")
     tm.Mitigation("M-DOCS", title="Document the risk", status="optional")
     tm.Mitigation("M-WAF", title="Add a WAF", status="proposed")
     tm.ThreatActor("Nation state", description="Well resourced")
@@ -126,9 +125,6 @@ def test_threat_page_contents(tmp_path: Path) -> None:
     # risk 9 (High x Medium) and residual 6 (High x Low)
     assert '<div class="count-box__value">9</div>' in page
     assert "after mitigations: 6" in page
-    # Per-component state is spelled out, not shown by colour alone.
-    assert "Web app: in place" in page
-    assert "Worker: missing" in page
     child = (tmp_path / "threat_T-DEPS.html").read_text()
     assert "threat_T-INPUT.html" in child
 
@@ -137,7 +133,6 @@ def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
     render(author_model(), tmp_path)
     mit = (tmp_path / "mitigation_M-SANITIZE.html").read_text()
     assert "threat_T-INPUT.html" in mit
-    assert "Web app" in mit and "Worker" in mit
     listing = (tmp_path / "mitigations.html").read_text()
     assert "mitigation_M-WAF.html" in listing and "proposed" in listing
     actor = (tmp_path / "threat_actor_Any.html").read_text()
@@ -147,10 +142,11 @@ def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
 def test_summary_and_matrix(tmp_path: Path) -> None:
     render(author_model(), tmp_path)
     matrix = (tmp_path / "threats_components.html").read_text()
-    assert "status--partially-mitigated" in matrix
-    assert "M-SANITIZE: missing" in matrix
-    prop = (tmp_path / "property_sanitizes_input.html").read_text()
-    assert "Worker" in prop and "mitigation_M-SANITIZE.html" in prop
+    # The legend also uses this class, so match the cell markup itself.
+    assert '<td class="prop-cell status--partially-mitigated"' in matrix
+    assert '<span class="tag tag--text">M-SANITIZE</span>' in matrix
+    prop = (tmp_path / "property_reads_input.html").read_text()
+    assert "threat_T-INPUT.html" in prop
 
 
 def diagram_sources(page: str) -> list[str]:
@@ -277,12 +273,3 @@ def test_builds_are_reproducible(tmp_path: Path) -> None:
     assert (builds[0] / "threat_RATM-4-EXEC.html").exists()
     for other in builds[1:]:
         assert differing_files(builds[0], other) == [], other.name
-
-
-def test_proposed_mitigation_page_lists_components(tmp_path: Path) -> None:
-    report = author_model()
-    report["mitigations"]["M-WAF"]["property"] = "sanitizes_input"
-    render(report, tmp_path)
-    page = (tmp_path / "mitigation_M-WAF.html").read_text()
-    assert "No affected components." not in page
-    assert "component_Worker.html" in page

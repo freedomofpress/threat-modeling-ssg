@@ -19,16 +19,6 @@
     {% endfor %}
 </div>
 
-{% if potential_mitigations %}
-<h2>Potential Mitigations</h2>
-    <p>Mitigations of this component's threats that are missing here:</p>
-    <div class="tag-list">
-        {% for mit in potential_mitigations %}
-        <a href="{{ mit.id | mitigation_href }}" class="tag tag--false" title="{{ mit.title }}">{{ mit.id }} · {{ mit.property | display }}</a>
-        {% endfor %}
-    </div>
-{% endif %}
-
 <h2>Threats Affecting This Component</h2>
 {% if threats %}
 <table>
@@ -50,8 +40,8 @@
             <td>{{ threat.details }}</td>
             <td>{{ m.status_badge(threat.status) }}</td>
             <td>
-                {% for st in threat_mitigations[threat_id] %}
-                {{ m.presence_tag(st.mitigation.id, st.implemented, href=st.mitigation.id | mitigation_href, title=st.mitigation.title) }}
+                {% for mit in model.threat_mitigations(threat) %}
+                <a href="{{ mit.id | mitigation_href }}" class="tag tag--text" title="{{ mit.title }}">{{ mit.id }}</a>
                 {% endfor %}
             </td>
         </tr>

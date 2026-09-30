@@ -32,7 +32,6 @@
 {% if mitigation.description %}<p>{{ mitigation.description }}</p>{% endif %}
 
 <div class="tag-list">
-    {% if mitigation.property %}<a href="{{ mitigation.property | property_href }}" class="tag tag--true">checked with property: {{ mitigation.property | display }}</a>{% endif %}
 </div>
 
 <h2>Threats it mitigates</h2>
@@ -45,23 +44,6 @@
 {% if further_threats %}
 <h2>Possible further mitigation for</h2>
 {{ threat_rows(further_threats) }}
-{% endif %}
-
-{% if component_states is not none %}
-<h2>Affected components</h2>
-{% if component_states %}
-<ul class="prop-list">
-    {% for name, comp, implemented in component_states %}
-    <li>
-        <a href="component_{{ name | slugify }}.html">{{ name }}</a>
-        <span class="prop-meta">{{ comp.component_class }}{% if comp.inBoundary %} · {{ comp.inBoundary }}{% endif %}</span>
-        {{ m.presence_tag("", implemented) }}
-    </li>
-    {% endfor %}
-</ul>
-{% else %}
-<p><em>No affected components.</em></p>
-{% endif %}
 {% endif %}
 
 <p><a href="mitigations.html">Back to Mitigations</a> | <a href="index.html">Back to Summary</a></p>

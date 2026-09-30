@@ -11,15 +11,6 @@
 <a href="{{ mitigation.id | mitigation_href }}">{{ mitigation.id }}</a>
 {%- endmacro %}
 
-{# Whether a component has a mitigation: true, false, or none when the
-   mitigation sets no property and so cannot be checked. The word is spelled
-   out so the state does not depend on colour alone. #}
-{% macro presence_tag(label, state, href=none, title=none) -%}
-{% set cls = 'tag--true' if state is sameas true else ('tag--false' if state is sameas false else 'tag--text') %}
-{% set word = 'in place' if state is sameas true else ('missing' if state is sameas false else '') %}
-{% if href %}<a href="{{ href }}"{% else %}<span{% endif %} class="tag {{ cls }}"{% if title %} title="{{ title }}"{% endif %}>{{ label }}{% if word %}{% if label %}: {% endif %}{{ word }}{% endif %}{% if href %}</a>{% else %}</span>{% endif %}
-{%- endmacro %}
-
 {% macro risk(threat) -%}
 {{ threat.risk_score if threat.risk_score is not none else "Unknown" }}
 {%- endmacro %}

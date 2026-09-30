@@ -4,14 +4,13 @@
 
 {% import "includes/macros.html" as m %}
 
-{% macro mitigation_tags(mitigations, states) %}
+{% macro mitigation_tags(mitigations) %}
 {% if not mitigations %}
 <span class="cell-tip__none">No mitigations listed for this threat.</span>
 {% else %}
 <span class="cell-tip__tags">
     {% for mit in mitigations %}
-    {% set st = states | selectattr("mitigation.id", "equalto", mit.id) | first %}
-    {{ m.presence_tag(mit.id, st.implemented if st else none) }}
+    <span class="tag tag--text">{{ mit.id }}</span>
     {% endfor %}
 </span>
 {% endif %}
@@ -39,7 +38,7 @@
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
                     <span class="cell-tip__meta">Impact: {{ threat.impact_label }} · Likelihood: {{ threat.likelihood_label }} · Risk: {{ m.risk(threat) }} · Status: {{ threat.status }}</span>
-                    {{ mitigation_tags(model.threat_mitigations(threat), []) }}
+                    {{ mitigation_tags(model.threat_mitigations(threat)) }}
                 </span>
             </th>
             {% endfor %}
@@ -60,14 +59,13 @@
                 <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>
             </td>
             {% for tid, threat in active_threats %}
-            {% set cell = status[tid].get(comp_name) %}
-            {% if cell %}
+            {% if comp_name in applies[tid] %}
             <td class="prop-cell status--{{ threat.status | status_slug }}">
                 &#x25CF;
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
                     <span class="cell-tip__meta">{{ comp_name }} · Status: {{ threat.status }} · Risk: {{ m.risk(threat) }}</span>
-                    {{ mitigation_tags(model.threat_mitigations(threat), cell.states) }}
+                    {{ mitigation_tags(model.threat_mitigations(threat)) }}
                 </span>
             </td>
             {% else %}
