@@ -398,3 +398,49 @@ def test_threat_open_and_bands() -> None:
     assert threat.residual_risk_band == "medium"
     assert Threat(SID="T", status="accepted").is_open is False
     assert Threat(SID="T").risk_band is None
+
+
+def test_backlog_ranks_proposed_mitigations_by_threat_risk(model_factory) -> None:
+    model = model_factory(
+        threats={
+            "T1": Threat(
+                SID="T1",
+                status="unmanaged",
+                impact="High",
+                likelihood="High",
+                mapping=ThreatMapping(further_mitigations=["M-LOW", "M-HIGH"]),
+            ),
+            "T2": Threat(
+                SID="T2",
+                status="accepted",
+                impact="Low",
+                likelihood="Low",
+                mapping=ThreatMapping(further_mitigations=["M-LOW"]),
+            ),
+            "T3": Threat(
+                SID="T3",
+                impact="Medium",
+                likelihood="Low",
+                mapping=ThreatMapping(mitigations=["M-LOW"]),
+            ),
+        },
+        components={},
+        scenarios=[],
+        mitigations={
+            "M-LOW": Mitigation(id="M-LOW", title="Low", status="proposed"),
+            "M-HIGH": Mitigation(id="M-HIGH", title="High", status="proposed"),
+            "M-DONE": Mitigation(id="M-DONE", title="Done"),
+            "M-UNUSED": Mitigation(id="M-UNUSED", title="Unused", status="proposed"),
+        },
+    )
+    backlog = model.backlog()
+    # Both reach risk 12 through T1. M-LOW covers more open threats, so it wins the tie.
+    # The implemented mitigation is not in the backlog.
+    assert [row["mitigation"].id for row in backlog] == ["M-LOW", "M-HIGH", "M-UNUSED"]
+    assert backlog[1]["open_count"] == 1
+    low = backlog[0]
+    # Threats that list it in place or as a further mitigation, highest risk first.
+    assert [tid for tid, _ in low["threats"]] == ["T1", "T3", "T2"]
+    assert low["top_risk"] == 12
+    assert low["open_count"] == 2
+    assert backlog[2]["threats"] == [] and backlog[2]["top_risk"] is None

@@ -95,6 +95,7 @@ def test_render_all_views(tmp_path: Path) -> None:
         "threat_rules.html",
         "internals.html",
         "guide.html",
+        "backlog.html",
         "components.html",
         "scenarios.html",
         "mitigations.html",
@@ -166,6 +167,14 @@ def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
     assert "threat_T-INPUT.html" in mit
     listing = (tmp_path / "mitigations.html").read_text()
     assert "mitigation_M-WAF.html" in listing and "proposed" in listing
+    assert 'data-filter-for="mitigation-list"' in listing
+    # The list shows counts, not ids. M-SANITIZE mitigates one threat.
+    assert "1 threat</td>" in listing
+    backlog = (tmp_path / "backlog.html").read_text()
+    # M-WAF is proposed for T-INPUT (residual 6) and is the only backlog entry.
+    assert 'href="mitigation_M-WAF.html"' in backlog
+    assert 'href="mitigation_M-SANITIZE.html"' not in backlog
+    assert 'href="threat_T-INPUT.html"' in backlog
     actor = (tmp_path / "threat_actor_Any.html").read_text()
     assert "threat_T-INPUT.html" in actor and "threat_T-DEPS.html" in actor
 

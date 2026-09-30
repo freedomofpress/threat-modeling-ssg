@@ -31,3 +31,8 @@
 {% if score is none %}<span class="muted">Unknown</span>{% else %}<span class="risk"><span class="risk-value">{{ score }}</span> <span class="risk-band risk-band--{{ score | risk_band }}">{{ score | risk_band }}</span></span>{% endif %}
 {%- endmacro %}
 
+{# "3 threats", "1 threat", or a muted "None". #}
+{% macro count(n, noun) -%}
+{% if n %}{{ n }} {{ noun }}{{ "s" if n != 1 }}{% else %}<span class="muted">None</span>{% endif %}
+{%- endmacro %}
+

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "includes/macros.html" as m %}
+{% set active_page = "backlog.html" %}
+{% block title %}Backlog - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Backlog</h1>
+
+<p>Proposed mitigations, ranked by the highest risk after mitigations among the threats they would help with, then by how many of those threats are open. See <a href="guide.html">how to read this model</a> for what the scores mean.</p>
+
+{% if rows %}
+<div class="scroll-x">
+<table>
+    <thead>
+        <tr>
+            <th>Mitigation</th>
+            <th>Highest risk it would reduce</th>
+            <th>Open threats</th>
+            <th>Threats</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td>{{ m.mitigation_link(row.mitigation) }}</td>
+            <td>{{ m.risk_value(row.top_risk) }}</td>
+            <td>{{ row.open_count }} of {{ row.threats | length }}</td>
+            <td class="register-list">
+                {% for tid, threat in row.threats[:3] %}{{ m.threat_link(tid, threat) }}{% if not loop.last %}; {% endif %}{% else %}<span class="muted">Not listed on any threat</span>{% endfor %}
+                {% if row.threats | length > 3 %}<a href="{{ row.mitigation.id | mitigation_href }}" class="muted">and {{ row.threats | length - 3 }} more</a>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<p>No mitigations are proposed.</p>
+{% endif %}
+{% endblock %}

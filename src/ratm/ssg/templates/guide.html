@@ -25,7 +25,7 @@
 
 <h2 id="risk">Risk</h2>
 <p>Risk is impact times likelihood. Impact runs from Low (1) to High (3) and likelihood from Very Low (1) to High (4), so risk runs from 1 to 12. Scores of {% for name, low, high in bands %}{{ low }}–{{ high }} are {{ name }}{% if loop.revindex == 2 %}, and {% elif not loop.last %}, {% endif %}{% endfor %}.</p>
-<div class="table-scroll">
+<div class="scroll-x">
 <table class="risk-grid">
     <thead>
         <tr>
