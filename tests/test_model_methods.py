@@ -444,3 +444,31 @@ def test_backlog_ranks_proposed_mitigations_by_threat_risk(model_factory) -> Non
     assert low["top_risk"] == 12
     assert low["open_count"] == 2
     assert backlog[2]["threats"] == [] and backlog[2]["top_risk"] is None
+
+
+def test_open_risk_summary() -> None:
+    model = ThreatModel(
+        threats={
+            "T1": Threat(SID="T1", status="unmanaged", impact="Low", likelihood="Low"),
+            "T2": Threat(
+                SID="T2",
+                status="partially mitigated",
+                impact="High",
+                likelihood="High",
+                residual_likelihood="Low",
+            ),
+            "T3": Threat(
+                SID="T3", status="mitigated", impact="High", likelihood="High"
+            ),
+        },
+        components={},
+        scenarios=[],
+        properties={},
+    )
+    # Highest risk after mitigations among open threats only: T2's 6, not T3's 12.
+    assert model.open_risk(["T1", "T2", "T3", "missing"]) == {
+        "total": 3,
+        "open": 2,
+        "top_risk": 6,
+    }
+    assert model.open_risk(["T3"]) == {"total": 1, "open": 0, "top_risk": None}

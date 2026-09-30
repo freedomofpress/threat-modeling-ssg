@@ -367,6 +367,21 @@ class ThreatModel(BaseModel):
         ]
         return mitigating, proposing
 
+    def open_risk(self, threat_ids: Iterable[str]) -> dict[str, Any]:
+        """Summarize a group of threats: how many, how many are open, and the highest
+        risk after mitigations among the open ones."""
+        threats = [self.threats[tid] for tid in set(threat_ids) if tid in self.threats]
+        open_scores = [
+            t.residual_risk_score
+            for t in threats
+            if t.is_open and t.residual_risk_score
+        ]
+        return {
+            "total": len(threats),
+            "open": sum(t.is_open for t in threats),
+            "top_risk": max(open_scores) if open_scores else None,
+        }
+
     def backlog(self) -> list[dict[str, Any]]:
         """Proposed mitigations, ranked by the highest risk they would reduce.
 

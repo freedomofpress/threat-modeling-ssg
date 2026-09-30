@@ -1,10 +1,40 @@
 {% extends "base.html" %}
+{% import "includes/macros.html" as m %}
 {% set active_page = "components.html" %}
 {% block title %}Components - Threat Model{% endblock %}
 
 {% block content %}
+<h1>Components</h1>
 
-{% include "includes/components_table.html" %}
+<p>The parts of the system, the ones carrying the most open risk first. Open threats are unmanaged or partially mitigated. See <a href="guide.html">how to read this model</a>.</p>
 
-<p><a href="index.html">Back to Summary</a></p>
+{% for group in class_lists %}
+<h2>{{ group.label }}</h2>
+<div class="scroll-x">
+<table>
+    <thead>
+        <tr>
+            <th>{{ group.label | trim("s") if group.label != "Boundaries" else "Boundary" }}</th>
+            <th>In boundary</th>
+            <th>Open threats</th>
+            <th>Highest open risk</th>
+            <th>All threats</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in group.members %}
+        <tr>
+            <td><a href="component_{{ row.name | slugify }}.html">{{ row.name }}</a>{% if row.component.description %}<div class="prop-meta">{{ row.component.description }}</div>{% endif %}</td>
+            <td>{{ row.component.inBoundary or "" }}</td>
+            <td>{{ row.open or "" }}</td>
+            <td>{% if row.top_risk %}{{ m.risk_value(row.top_risk) }}{% endif %}</td>
+            <td>{{ row.total or "" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endfor %}
+
+<p class="muted">Which properties each component has is listed under <a href="component_properties.html">component properties</a>.</p>
 {% endblock %}

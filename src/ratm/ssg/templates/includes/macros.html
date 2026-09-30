@@ -36,3 +36,8 @@
 {% if n %}{{ n }} {{ noun }}{{ "s" if n != 1 }}{% else %}<span class="muted">None</span>{% endif %}
 {%- endmacro %}
 
+{# "2 open threats, highest risk 9 high · 5 threats in all". #}
+{% macro open_risk_line(summary) -%}
+{% if summary.open %}<strong>{{ summary.open }} open threat{{ "s" if summary.open != 1 }}</strong>{% if summary.top_risk %}, highest risk {{ risk_value(summary.top_risk) }}{% endif %}{% else %}No open threats{% endif %} · {{ summary.total }} threat{{ "s" if summary.total != 1 }} in all
+{%- endmacro %}
+
