@@ -1010,3 +1010,112 @@ td.prop-cell[class*="status--"] {
     color: var(--color-text-dim);
     font-size: 0.9em;
 }
+
+/* A threat or mitigation named by its title, with the id alongside. */
+.ref-id {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8em;
+    color: var(--color-text-dim);
+    white-space: nowrap;
+}
+
+.risk-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.risk-band {
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-dim);
+}
+
+.risk-band--high {
+    color: var(--color-text);
+    font-weight: bold;
+}
+
+.muted {
+    color: var(--color-text-dim);
+}
+
+/* Filter bar above sortable tables. */
+.table-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    align-items: flex-end;
+    margin: 16px 0;
+}
+
+.table-filters label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8em;
+    color: var(--color-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.table-filters select,
+.table-filters input {
+    font: inherit;
+    font-size: 1.1em;
+    text-transform: none;
+    letter-spacing: normal;
+    padding: 4px 8px;
+    color: var(--color-text);
+    background: var(--color-bg-container);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    min-width: 12rem;
+}
+
+.table-count {
+    margin-left: auto;
+    color: var(--color-text-dim);
+    font-size: 0.9em;
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+table[data-sortable] th button {
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+table[data-sortable] th[aria-sort="ascending"] button::after { content: " \25B2"; }
+table[data-sortable] th[aria-sort="descending"] button::after { content: " \25BC"; }
+
+.register td {
+    vertical-align: top;
+}
+
+.register-threat {
+    min-width: 16rem;
+}
+
+.register-list {
+    font-size: 0.9em;
+    min-width: 10rem;
+}
+
+.internals-list {
+    display: grid;
+    gap: 8px;
+}
+
+.footer-nav {
+    margin-bottom: 8px;
+}
+

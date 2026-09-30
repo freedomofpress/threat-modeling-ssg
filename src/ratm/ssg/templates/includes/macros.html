@@ -14,3 +14,14 @@
 {% macro risk(threat) -%}
 {{ threat.risk_score if threat.risk_score is not none else "Unknown" }}
 {%- endmacro %}
+
+{# A threat named by its title, with its id alongside for reference. #}
+{% macro threat_link(tid, threat) -%}
+<a href="threat_{{ tid }}.html">{{ threat.description if threat and threat.description else tid }}</a> <span class="ref-id">{{ tid }}</span>
+{%- endmacro %}
+
+{# A risk score with its band, e.g. "9 high", or "Unknown" when a label is missing. #}
+{% macro risk_value(score) -%}
+{% if score is none %}<span class="muted">Unknown</span>{% else %}<span class="risk-value">{{ score }}</span> <span class="risk-band risk-band--{{ score | risk_band }}">{{ score | risk_band }}</span>{% endif %}
+{%- endmacro %}
+

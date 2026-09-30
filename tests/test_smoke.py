@@ -92,6 +92,8 @@ def test_render_all_views(tmp_path: Path) -> None:
         "index.html",
         "threats.html",
         "threats_components.html",
+        "threat_rules.html",
+        "internals.html",
         "components.html",
         "scenarios.html",
         "mitigations.html",
@@ -127,6 +129,21 @@ def test_threat_page_contents(tmp_path: Path) -> None:
     assert "after mitigations: 6" in page
     child = (tmp_path / "threat_T-DEPS.html").read_text()
     assert "threat_T-INPUT.html" in child
+
+
+def test_register_lists_threats_in_risk_order(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    page = (tmp_path / "threats.html").read_text()
+    assert 'id="register"' in page and "data-sortable" in page
+    # Residual 6 (High x Low), then 4 (Medium x Low), then unknown.
+    order = [
+        page.index(f'href="threat_{tid}.html"')
+        for tid in ("T-INPUT", "T-DEPS", "T-BARE")
+    ]
+    assert order == sorted(order)
+    # Filter values for the status select, including the open group.
+    assert 'data-status="partially mitigated|open"' in page
+    assert '<option value="open">' in page
 
 
 def test_mitigation_and_actor_pages(tmp_path: Path) -> None:

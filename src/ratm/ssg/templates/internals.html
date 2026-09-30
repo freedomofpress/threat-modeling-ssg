@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% set active_page = "internals.html" %}
+{% block title %}Model internals - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Model internals</h1>
+
+<p>Views for the people who write the model. They show how threats are matched to components through component properties, which helps check that each rule fires where it should. Readers looking for risk should start from the <a href="threats.html">threats</a> instead.</p>
+
+<ul class="internals-list">
+    <li><a href="threat_rules.html">Matching rules</a>: which component properties each threat's requirements use.</li>
+    <li><a href="threats_components.html">Threats × components matrix</a>: every threat that applies, against every component it applies to.</li>
+</ul>
+
+<h2>Component properties</h2>
+<ul class="internals-list">
+    {% for key, prop in model.properties.items() %}
+    <li><a href="{{ key | property_href }}">{{ key | display }}</a>{% if prop.description %} <span class="muted">{{ prop.description }}</span>{% endif %}</li>
+    {% endfor %}
+</ul>
+{% endblock %}

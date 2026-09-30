@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from .. import scales
 from . import views  # noqa: F401 — registers @view decorators
 from .models import SiteConfig, ThreatModel
 from .utils import (
@@ -52,6 +53,7 @@ def build_env() -> Environment:
     env.filters["mitigation_href"] = mitigation_href
     env.filters["threat_actor_href"] = threat_actor_href
     env.filters["status_slug"] = status_slug
+    env.filters["risk_band"] = scales.risk_band
 
     # FIXME: These are a bit hackish, but work.
     env.filters["sort_by_class"] = lambda d: sorted(
