@@ -94,6 +94,7 @@ def test_render_all_views(tmp_path: Path) -> None:
         "threats_components.html",
         "threat_rules.html",
         "internals.html",
+        "guide.html",
         "components.html",
         "scenarios.html",
         "mitigations.html",
@@ -318,3 +319,12 @@ def test_builds_are_reproducible(tmp_path: Path) -> None:
     assert (builds[0] / "threat_RATM-4-EXEC.html").exists()
     for other in builds[1:]:
         assert differing_files(builds[0], other) == [], other.name
+
+
+def test_guide_explains_statuses_and_scores(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    guide = (tmp_path / "guide.html").read_text()
+    for status in ("unmanaged", "partially mitigated", "out of scope", "proposed"):
+        assert status in guide, status
+    # The risk grid: High impact x High likelihood is the maximum, 12.
+    assert 'data-impact="High" data-likelihood="High">12' in guide

@@ -437,3 +437,26 @@ def internals_view(
 ) -> dict[str, Any]:
     """Model internals: authoring aids kept out of the reader-facing pages."""
     return {"config": config, "model": model}
+
+
+@view("/guide.html", log="Generating guide.html...")
+def guide_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """How to read the model: statuses, the risk scale, and residual risk."""
+    impacts = sorted(scales.IMPACT_SCORES, key=scales.IMPACT_SCORES.get, reverse=True)
+    likelihoods = sorted(scales.LIKELIHOOD_SCORES, key=scales.LIKELIHOOD_SCORES.get)
+    return {
+        "config": config,
+        "model": model,
+        "threat_statuses": [
+            (s, description, s in scales.OPEN_STATUSES)
+            for s, description in scales.THREAT_STATUSES.items()
+        ],
+        "mitigation_statuses": list(scales.MITIGATION_STATUSES.items()),
+        "impacts": [(i, scales.IMPACT_SCORES[i]) for i in impacts],
+        "likelihoods": [(lk, scales.LIKELIHOOD_SCORES[lk]) for lk in likelihoods],
+        "risk_score": scales.risk_score,
+        "bands": scales.RISK_BANDS,
+    }
