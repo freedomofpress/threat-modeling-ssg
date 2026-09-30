@@ -21,11 +21,50 @@ def threats_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
+    """The risk register: every threat in risk order, sortable and filterable."""
+    analysis = model.analyze()
+    rows = []
+    for tid, threat in model.threats_by_risk():
+        components = sorted(
+            analysis["threats_to_components"].get(tid, set()), key=scales.natural_key
+        )
+        rows.append({"tid": tid, "threat": threat, "components": components})
+    id_rank = {
+        tid: rank
+        for rank, tid in enumerate(sorted(model.threats, key=scales.natural_key))
+    }
+    return {
+        "config": config,
+        "model": model,
+        "rows": rows,
+        "id_rank": id_rank,
+        "status_rank": {s: i for i, s in enumerate(scales.THREAT_STATUSES)},
+        "impact_scores": scales.IMPACT_SCORES,
+        "likelihood_scores": scales.LIKELIHOOD_SCORES,
+        "statuses": [
+            s
+            for s in scales.THREAT_STATUSES
+            if any(t.status == s for t in model.threats.values())
+        ],
+        "actors": sorted(
+            {a for t in model.threats.values() for a in t.threat_actors},
+            key=scales.natural_key,
+        ),
+    }
+
+
+@view("/threat_rules.html", log="Generating threat_rules.html...")
+def threat_rules_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Model internals: which component properties each threat's rule uses."""
     all_props = list(model.properties)
     impact_tables = []
     for impact in scales.IMPACT_ORDER:
         threats = sorted(
-            (tid, t) for tid, t in model.threats.items() if t.impact_label == impact
+            ((tid, t) for tid, t in model.threats.items() if t.impact_label == impact),
+            key=lambda item: scales.natural_key(item[0]),
         )
         if not threats:
             continue
@@ -351,3 +390,12 @@ def threat_actor_view(
             "actor_slug": slugify(name),
             "threats": threats,
         }
+
+
+@view("/internals.html", log="Generating internals.html...")
+def internals_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Model internals: authoring aids kept out of the reader-facing pages."""
+    return {"config": config, "model": model}

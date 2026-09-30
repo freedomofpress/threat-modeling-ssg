@@ -1,0 +1,80 @@
+{# Sorting and filtering for tables marked data-sortable, and filter forms marked
+   data-filter-for="<table id>". Rows carry their sort values as data-sort-<key>
+   numbers and their filter values as data-<name> ("|"-separated lists), so the
+   visible text never has to be parsed. Without JavaScript every table still
+   renders complete, in the order the server chose. #}
+<script>
+(function () {
+    function rowsOf(table) {
+        return Array.prototype.slice.call(table.tBodies[0].rows);
+    }
+
+    document.querySelectorAll("table[data-sortable]").forEach(function (table) {
+        var buttons = table.querySelectorAll("th button[data-sort-key]");
+        buttons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                var th = button.parentElement;
+                var key = "sort" + button.dataset.sortKey.charAt(0).toUpperCase() + button.dataset.sortKey.slice(1);
+                var first = button.dataset.sortFirst || "desc";
+                var current = th.getAttribute("aria-sort");
+                var dir = current === "none" ? first : (current === "descending" ? "asc" : "desc");
+                table.querySelectorAll("th[aria-sort]").forEach(function (other) {
+                    other.setAttribute("aria-sort", "none");
+                });
+                th.setAttribute("aria-sort", dir === "asc" ? "ascending" : "descending");
+                var sign = dir === "asc" ? 1 : -1;
+                var body = table.tBodies[0];
+                rowsOf(table)
+                    .map(function (row, index) { return { row: row, index: index }; })
+                    .sort(function (a, b) {
+                        var diff = (parseFloat(a.row.dataset[key]) - parseFloat(b.row.dataset[key])) * sign;
+                        return diff || a.index - b.index;
+                    })
+                    .forEach(function (item) { body.appendChild(item.row); });
+            });
+        });
+    });
+
+    document.querySelectorAll("form[data-filter-for]").forEach(function (form) {
+        var table = document.getElementById(form.dataset.filterFor);
+        if (!table) return;
+        var count = document.querySelector('[data-count-for="' + form.dataset.filterFor + '"]');
+        var total = rowsOf(table).length;
+        var params = new URLSearchParams(window.location.search);
+        form.querySelectorAll("[name]").forEach(function (control) {
+            if (params.has(control.name)) control.value = params.get(control.name);
+        });
+
+        function apply() {
+            var shown = 0;
+            var query = new URLSearchParams();
+            rowsOf(table).forEach(function (row) {
+                var visible = true;
+                form.querySelectorAll("[name]").forEach(function (control) {
+                    var value = control.value.trim().toLowerCase();
+                    if (!value) return;
+                    query.set(control.name, control.value.trim());
+                    var data = (row.dataset[control.name] || "").toLowerCase();
+                    var match = control.type === "search"
+                        ? data.indexOf(value) !== -1
+                        : data.split("|").indexOf(value) !== -1;
+                    if (!match) visible = false;
+                });
+                row.hidden = !visible;
+                if (visible) shown += 1;
+            });
+            if (count) count.textContent = shown === total ? total + " shown" : shown + " of " + total + " shown";
+            try {
+                var search = query.toString();
+                history.replaceState(null, "", search ? "?" + search : window.location.pathname);
+            } catch (e) {
+                /* Some browsers refuse replaceState on file:// pages. Filtering still works. */
+            }
+        }
+
+        form.addEventListener("input", apply);
+        form.addEventListener("submit", function (event) { event.preventDefault(); });
+        apply();
+    });
+})();
+</script>

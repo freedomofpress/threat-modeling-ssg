@@ -21,9 +21,8 @@
                 <nav>
                     {% for href, label in [
                         ("index.html", "Summary"),
-                        ("scenarios.html", "Scenarios"),
-                        ("threats_components.html", "Matrix"),
                         ("threats.html", "Threats"),
+                        ("scenarios.html", "Scenarios"),
                         ("mitigations.html", "Mitigations"),
                         ("threat_actors.html", "Threat Actors"),
                         ("components.html", "Components"),
@@ -43,6 +42,7 @@
             {% block content %}{% endblock %}
         </div>
         <footer>
+            <nav class="footer-nav"><a href="internals.html"{% if active_page | default('') == "internals.html" %} class="nav-active"{% endif %}>Model internals</a></nav>
             Thanks to <a href="https://lospec.com/palette-list/slso8">Luis Miguel Maldonado</a> for the colors!
         </footer>
     </div>

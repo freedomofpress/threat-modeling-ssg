@@ -1,13 +1,76 @@
 {% extends "base.html" %}
+{% import "includes/macros.html" as m %}
 {% set active_page = "threats.html" %}
-{% block title %}All Threats - Threat Model{% endblock %}
+{% block title %}Threats - Threat Model{% endblock %}
 
 {% block content %}
-<h1>All Threats</h1>
+<h1>Threats</h1>
 
-<p>{{ model.threats | length }} threats defined &mdash; {{ analysis.threat_counter | length }} appear in scenario findings.</p>
+<p>Every threat in the model, highest residual risk first. Select a column heading to sort by it. See <a href="guide.html">how to read this model</a> for what the statuses and scores mean.</p>
 
-{% include "includes/threats_table.html" %}
+<form class="table-filters" data-filter-for="register">
+    <label>Status
+        <select name="status" id="register-status">
+            <option value="">Any</option>
+            <option value="open">Open (unmanaged or partially mitigated)</option>
+            {% for status in statuses %}<option value="{{ status }}">{{ status | capitalize }}</option>{% endfor %}
+        </select>
+    </label>
+    {% if actors %}
+    <label>Threat actor
+        <select name="actor" id="register-actor">
+            <option value="">Any</option>
+            {% for actor in actors %}<option value="{{ actor }}">{{ actor }}</option>{% endfor %}
+        </select>
+    </label>
+    {% endif %}
+    <label>Search
+        <input type="search" name="q" id="register-search" placeholder="Title, id, or component">
+    </label>
+    <output class="table-count" data-count-for="register">{{ rows | length }} threats</output>
+</form>
 
-<p><a href="index.html">Back to Summary</a></p>
+<div class="table-scroll">
+<table class="register" id="register" data-sortable>
+    <thead>
+        <tr>
+            <th aria-sort="none"><button type="button" data-sort-key="id" data-sort-first="asc">Threat</button></th>
+            <th aria-sort="none"><button type="button" data-sort-key="status" data-sort-first="asc">Status</button></th>
+            <th aria-sort="none"><button type="button" data-sort-key="impact">Impact</button></th>
+            <th aria-sort="none"><button type="button" data-sort-key="likelihood">Likelihood</button></th>
+            <th aria-sort="none"><button type="button" data-sort-key="risk">Risk</button></th>
+            <th aria-sort="descending"><button type="button" data-sort-key="residual">After mitigations</button></th>
+            <th>Components</th>
+            <th>Threat actors</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        {% set t = row.threat %}
+        <tr data-status="{{ t.status }}{% if t.is_open %}|open{% endif %}"
+            data-actor="{{ t.threat_actors | join('|') }}"
+            data-q="{{ [row.tid, t.description, row.components | join(' ')] | join(' ') | lower }}"
+            data-sort-id="{{ id_rank[row.tid] }}"
+            data-sort-status="{{ status_rank[t.status] | default(99) }}"
+            data-sort-impact="{{ impact_scores.get(t.impact_label, 0) }}"
+            data-sort-likelihood="{{ likelihood_scores.get(t.likelihood_label, 0) }}"
+            data-sort-risk="{{ t.risk_score or 0 }}"
+            data-sort-residual="{{ t.residual_risk_score or 0 }}">
+            <td class="register-threat">{{ m.threat_link(row.tid, t) }}</td>
+            <td>{{ m.status_badge(t.status) }}</td>
+            <td>{{ t.impact_label }}</td>
+            <td>{{ t.likelihood_label }}</td>
+            <td>{{ m.risk_value(t.risk_score) }}</td>
+            <td>{{ m.risk_value(t.residual_risk_score) }}</td>
+            <td class="register-list">{% for comp in row.components %}<a href="component_{{ comp | slugify }}.html">{{ comp }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">None in any scenario</span>{% endfor %}</td>
+            <td class="register-list">{{ t.threat_actors | join(', ') }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include "includes/table_tools.html" %}
 {% endblock %}

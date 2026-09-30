@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% set active_page = "internals.html" %}
+{% block title %}Matching rules - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Matching rules</h1>
+
+<p>Which component properties each threat's requirements use. <strong>R</strong> marks a property the rule checks. <strong>R*</strong> marks a sub-item, negation, or comparison. Highlighted threats apply to at least one component in a scenario. Part of the <a href="internals.html">model internals</a>.</p>
+
+{% include "includes/threats_table.html" %}
+{% endblock %}
