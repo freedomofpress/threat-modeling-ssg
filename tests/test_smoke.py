@@ -156,6 +156,20 @@ def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
     assert "threat_T-INPUT.html" in actor and "threat_T-DEPS.html" in actor
 
 
+def test_summary_leads_with_open_risk(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    index = (tmp_path / "index.html").read_text()
+    # Status counts link to the register filtered to that status.
+    assert 'href="threats.html?status=partially%20mitigated"' in index
+    assert 'href="threats.html?status=open"' in index
+    # Top open risks lists T-INPUT, which is open and applies. T-DEPS is mitigated and
+    # T-BARE is out of scope, so neither is listed.
+    top = index[index.index("Top open risks") :]
+    assert 'href="threat_T-INPUT.html"' in top
+    assert 'href="threat_T-DEPS.html"' not in top
+    assert "dfd-container" not in index
+
+
 def test_summary_and_matrix(tmp_path: Path) -> None:
     render(author_model(), tmp_path)
     matrix = (tmp_path / "threats_components.html").read_text()
@@ -214,7 +228,8 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
     assert "label = &lt;&lt;i&gt;Net&lt;/i&gt;&gt;;" in page
     assert diagram_sources(page) == [scenario.dfd, scenario.mermaid]
     assert "label = <<i>Net</i>>;" in scenario.dfd
-    for name in ("index.html", "scenarios.html", "threat_T-INPUT.html"):
+    # The summary page has no diagrams, but the scenario index and threat pages do.
+    for name in ("scenarios.html", "threat_T-INPUT.html"):
         sources = diagram_sources((tmp_path / name).read_text())
         assert sources, name
         assert all(s.startswith(("digraph tm {", "sequenceDiagram")) for s in sources)

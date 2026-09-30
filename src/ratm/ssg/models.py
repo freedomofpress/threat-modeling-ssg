@@ -301,7 +301,9 @@ class ThreatModel(BaseModel):
             for label in scales.IMPACT_ORDER
             if impact_counter[label]
         }
-        status_counter = Counter(t.status for t in active)
+        # Count every defined threat, so each count matches the register filtered to
+        # that status.
+        status_counter = Counter(t.status for t in self.threats.values())
         status_distribution = {
             status: status_counter[status]
             for status in scales.THREAT_STATUSES

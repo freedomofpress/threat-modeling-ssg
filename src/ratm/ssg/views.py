@@ -13,7 +13,28 @@ def summary_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
-    return {"config": config, "model": model, "analysis": model.analyze()}
+    analysis = model.analyze()
+    # The highest residual risks that still need work and apply to at least one
+    # component in a scenario.
+    top_open = [
+        {
+            "tid": tid,
+            "threat": threat,
+            "components": sorted(
+                analysis["threats_to_components"].get(tid, set()),
+                key=scales.natural_key,
+            ),
+        }
+        for tid, threat in model.threats_by_risk()
+        if threat.is_open and tid in analysis["threat_counter"]
+    ][:10]
+    return {
+        "config": config,
+        "model": model,
+        "analysis": analysis,
+        "top_open": top_open,
+        "open_count": sum(t.is_open for t in model.threats.values()),
+    }
 
 
 @view("/threats.html", log="Generating threats.html...")

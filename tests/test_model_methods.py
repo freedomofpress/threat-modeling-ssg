@@ -315,7 +315,11 @@ def test_analysis_distributions_and_actors(model_factory) -> None:
     )
     analysis = model.analyze()
     assert analysis["impact_distribution"] == {"High": 1, "Low": 1}
-    assert analysis["status_distribution"] == {"unmanaged": 1, "mitigated": 1}
+    # Status counts include every defined threat, as the register's status filter does,
+    # and put the statuses most in need of attention first, so unmanaged comes before
+    # mitigated.
+    assert analysis["status_distribution"] == {"unmanaged": 2, "mitigated": 1}
+    assert list(analysis["status_distribution"]) == ["unmanaged", "mitigated"]
     # The actor mapping includes every defined threat, even ones no scenario finds.
     assert analysis["actors_to_threats"] == {"Any": ["T1", "T3"], "Troll": ["T3"]}
 
