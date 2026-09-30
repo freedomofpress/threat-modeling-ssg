@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from typing import Any, TextIO
 
 from pydantic import (
@@ -92,6 +93,33 @@ class Threat(BaseModel):
     def residual_risk_score(self) -> int | None:
         return scales.risk_score(
             self.residual_impact_label, self.residual_likelihood_label
+        )
+
+    @property
+    def risk_band(self) -> str | None:
+        return scales.risk_band(self.risk_score)
+
+    @property
+    def residual_risk_band(self) -> str | None:
+        return scales.risk_band(self.residual_risk_score)
+
+    @property
+    def is_open(self) -> bool:
+        """True while the threat still needs work (see scales.OPEN_STATUSES)."""
+        return self.status in scales.OPEN_STATUSES
+
+    @property
+    def risk_order(self) -> tuple:
+        """Sort key: highest residual risk first, then highest risk, then id.
+
+        Unknown scores sort after every known one. The id comes last so no two threats
+        tie, which keeps the order the same on every build.
+        """
+        unknown = 1
+        return (
+            -self.residual_risk_score if self.residual_risk_score else unknown,
+            -self.risk_score if self.risk_score else unknown,
+            scales.natural_key(self.SID),
         )
 
     @property
@@ -300,6 +328,14 @@ class ThreatModel(BaseModel):
         }
         return self._analysis
 
+    def threats_by_risk(
+        self, threat_ids: Iterable[str] | None = None
+    ) -> list[tuple[str, Threat]]:
+        """Return (id, threat) pairs in risk order, for the given ids or all threats."""
+        ids = self.threats if threat_ids is None else threat_ids
+        pairs = [(tid, self.threats[tid]) for tid in ids if tid in self.threats]
+        return sorted(pairs, key=lambda item: item[1].risk_order)
+
     def threat_mitigations(
         self, threat: Threat, further: bool = False
     ) -> list[Mitigation]:
@@ -318,14 +354,13 @@ class ThreatModel(BaseModel):
 
         The first lists it as in place, the second as a further mitigation.
         """
+        by_risk = self.threats_by_risk()
         mitigating = [
-            (tid, t)
-            for tid, t in sorted(self.threats.items())
-            if mitigation_id in t.mapping.mitigations
+            (tid, t) for tid, t in by_risk if mitigation_id in t.mapping.mitigations
         ]
         proposing = [
             (tid, t)
-            for tid, t in sorted(self.threats.items())
+            for tid, t in by_risk
             if mitigation_id in t.mapping.further_mitigations
         ]
         return mitigating, proposing
@@ -337,5 +372,8 @@ class ThreatModel(BaseModel):
             for tid, threat in self.threats.items():
                 for child in threat.children:
                     parents[child].append(tid)
-            self._parents = {child: sorted(tids) for child, tids in parents.items()}
+            self._parents = {
+                child: sorted(tids, key=scales.natural_key)
+                for child, tids in parents.items()
+            }
         return self._parents.get(threat_id, [])

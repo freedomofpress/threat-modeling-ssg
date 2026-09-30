@@ -348,3 +348,49 @@ def test_entity_lists_are_keyed() -> None:
     assert list(model.threats) == ["T1"]
     assert list(model.mitigations) == ["M1"]
     assert list(model.threat_actors) == ["Any"]
+
+
+def test_threats_by_risk_order() -> None:
+    """Residual risk first, then base risk, then natural id. Unknown risk last."""
+    model = ThreatModel(
+        threats={
+            "T10": Threat(SID="T10", impact="High", likelihood="High"),
+            "T2": Threat(SID="T2", impact="High", likelihood="High"),
+            "T3": Threat(
+                SID="T3",
+                impact="High",
+                likelihood="High",
+                residual_likelihood="Very Low",
+            ),
+            "T4": Threat(SID="T4", impact="Low", likelihood="Low"),
+            "T5": Threat(SID="T5"),
+            "T1": Threat(SID="T1"),
+        },
+        components={},
+        scenarios=[],
+        properties={},
+    )
+    assert [tid for tid, _ in model.threats_by_risk()] == [
+        "T2",
+        "T10",
+        "T3",
+        "T4",
+        "T1",
+        "T5",
+    ]
+    assert [tid for tid, _ in model.threats_by_risk(["T4", "T3"])] == ["T3", "T4"]
+
+
+def test_threat_open_and_bands() -> None:
+    threat = Threat(
+        SID="T",
+        status="partially mitigated",
+        impact="High",
+        likelihood="High",
+        residual_likelihood="Low",
+    )
+    assert threat.is_open is True
+    assert threat.risk_band == "high"
+    assert threat.residual_risk_band == "medium"
+    assert Threat(SID="T", status="accepted").is_open is False
+    assert Threat(SID="T").risk_band is None

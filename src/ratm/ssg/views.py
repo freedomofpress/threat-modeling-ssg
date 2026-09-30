@@ -1,4 +1,3 @@
-import re
 from collections import Counter
 from collections.abc import Iterable
 from typing import Any
@@ -232,20 +231,10 @@ def scenarios_view(
     return {"config": config, "model": model}
 
 
-def _threat_sort_key(item: tuple[str, Threat]) -> tuple[int, int]:
-    """Highest impact first, then by the number in the id."""
+def _threat_sort_key(item: tuple[str, Threat]) -> tuple:
+    """Highest impact first, then by id with its numbers compared."""
     tid, threat = item
-    match = re.search(r"\d+", tid)
-    return (
-        scales.IMPACT_ORDER.index(threat.impact_label),
-        int(match.group()) if match else 0,
-    )
-
-
-def _risk_sort_key(item: tuple[str, Threat]) -> tuple[int, str]:
-    """Highest risk first. Threats with no risk score go last."""
-    tid, threat = item
-    return (-(threat.risk_score or 0), tid)
+    return (scales.IMPACT_ORDER.index(threat.impact_label), scales.natural_key(tid))
 
 
 @view("/threats_components.html", log="Generating threats_components.html...")
@@ -303,7 +292,7 @@ def mitigations_view(
     model: ThreatModel,
 ) -> dict[str, Any]:
     rows = []
-    for mid in sorted(model.mitigations):
+    for mid in sorted(model.mitigations, key=scales.natural_key):
         mitigating, proposing = model.mitigation_threats(mid)
         rows.append((model.mitigations[mid], mitigating, proposing))
     return {"config": config, "model": model, "rows": rows}
@@ -354,14 +343,7 @@ def threat_actor_view(
 ) -> Iterable[dict[str, Any]]:
     analysis = model.analyze()
     for name, actor in model.threat_actors.items():
-        threats = sorted(
-            (
-                (tid, model.threats[tid])
-                for tid in analysis["actors_to_threats"].get(name, [])
-                if tid in model.threats
-            ),
-            key=_risk_sort_key,
-        )
+        threats = model.threats_by_risk(analysis["actors_to_threats"].get(name, []))
         yield {
             "config": config,
             "model": model,
