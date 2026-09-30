@@ -194,6 +194,9 @@ def component_view(
         }
 
 
+# Components carry the threats, so they come first. Boundaries rarely do.
+_CLASS_ORDER = {"Component": 0, "Actor": 1, "Boundary": 2}
+
 _PLURAL_CLASSES = {
     "Actor": "Actors",
     "Boundary": "Boundaries",
@@ -206,6 +209,43 @@ def components_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
+    """Components grouped by class, the ones carrying the most open risk first."""
+    analysis = model.analyze()
+    groups: dict[str, list] = {}
+    for name, component in model.components.items():
+        if component.component_class in config.hide_components_with_category:
+            continue
+        summary = model.open_risk(analysis["components_to_threats"].get(name, set()))
+        groups.setdefault(component.component_class, []).append(
+            {"name": name, "component": component, **summary}
+        )
+    class_lists = [
+        {
+            "label": _PLURAL_CLASSES.get(cls, cls),
+            "members": sorted(
+                members,
+                key=lambda row: (
+                    -(row["top_risk"] or 0),
+                    -row["open"],
+                    -row["total"],
+                    scales.natural_key(row["name"]),
+                ),
+            ),
+        }
+        for cls, members in sorted(
+            groups.items(),
+            key=lambda item: (_CLASS_ORDER.get(item[0], len(_CLASS_ORDER)), item[0]),
+        )
+    ]
+    return {"config": config, "model": model, "class_lists": class_lists}
+
+
+@view("/component_properties.html", log="Generating component_properties.html...")
+def component_properties_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Model internals: which properties each component has."""
     prop_keys = list(model.properties)
     members_by_class: dict[str, list] = {}
     for name, component in sorted(
@@ -294,6 +334,7 @@ def scenario_view(
             "config": config,
             "model": model,
             "scenario": scenario,
+            "summary": model.open_risk(f.threat_id for f in scenario.findings),
             "findings": findings,
             "scenario_name": slugify(scenario.name),
         }
@@ -304,7 +345,14 @@ def scenarios_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
-    return {"config": config, "model": model}
+    return {
+        "config": config,
+        "model": model,
+        "summaries": {
+            s.name: model.open_risk(f.threat_id for f in s.findings)
+            for s in model.scenarios
+        },
+    }
 
 
 def _threat_sort_key(item: tuple[str, Threat]) -> tuple:

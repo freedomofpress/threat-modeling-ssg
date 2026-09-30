@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "includes/macros.html" as m %}
 {% set active_page = "scenarios.html" %}
 
 {% block title %}Scenario: {{ scenario.name }} - Threat Model{% endblock %}
@@ -8,20 +9,7 @@
 
 <p>{{ scenario.description }}</p>
 
-<div class="stats">
-    <div class="count-box count-box--red">
-        <div class="count-box__value">{{ scenario.findings | length }}</div>
-        <div class="count-box__label">Findings</div>
-    </div>
-    <div class="count-box count-box--blue">
-        <div class="count-box__value">{{ scenario.flows | length }}</div>
-        <div class="count-box__label">Data Flows</div>
-    </div>
-    <div class="count-box count-box--orange">
-        <div class="count-box__value">{{ scenario.findings | map(attribute='target') | unique | list | length }}</div>
-        <div class="count-box__label">Affected Components</div>
-    </div>
-</div>
+<p class="scenario-summary">{{ m.open_risk_line(summary) }} · {{ scenario.flows | length }} data flow{{ "s" if scenario.flows | length != 1 }} · {{ scenario.findings | map(attribute='target') | unique | list | length }} affected component{{ "s" if scenario.findings | map(attribute='target') | unique | list | length != 1 }}</p>
 
 <h2>Data Flow Diagram</h2>
 {% with src=scenario.dfd %}{% include "includes/dfd_diagram.html" %}{% endwith %}

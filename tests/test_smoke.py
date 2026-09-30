@@ -94,6 +94,7 @@ def test_render_all_views(tmp_path: Path) -> None:
         "internals.html",
         "guide.html",
         "backlog.html",
+        "component_properties.html",
         "components.html",
         "scenarios.html",
         "mitigations.html",
@@ -242,10 +243,10 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
         for needle in ("&amp;amp;", "&amp;#34;", "&lt;span", "&lt;a "):
             assert needle not in page, (page_path.name, needle)
 
-    # The components table marks properties with the characters ✓ and ✗. Written as
-    # &#x2713; entities, they would be escaped and shown as literal text.
-    components = (tmp_path / "components.html").read_text()
-    assert ">✓</td>" in components and ">✗</td>" in components
+    # The component properties table marks properties with the characters ✓ and ✗.
+    # Written as &#x2713; entities, they would be escaped and shown as literal text.
+    properties = (tmp_path / "component_properties.html").read_text()
+    assert ">✓</td>" in properties and ">✗</td>" in properties
 
     # In the page, the diagram source is escaped. Decoding it must give back exactly the
     # DOT and Mermaid text, since that is what diagrams.js passes to Viz and Mermaid.
@@ -346,3 +347,21 @@ def test_guide_explains_statuses_and_scores(tmp_path: Path) -> None:
         assert status in guide, status
     # The risk grid: High impact x High likelihood is the maximum, 12.
     assert 'data-impact="High" data-likelihood="High">12' in guide
+
+
+def test_components_and_scenarios_show_open_risk(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    components = (tmp_path / "components.html").read_text()
+    # Web app and Worker both carry the open T-INPUT (residual 6). The table of
+    # component properties is on its own page, linked from the internals page, not on
+    # the components page.
+    assert 'href="component_Web_app.html"' in components
+    assert "prop-table" not in components
+    assert "prop-table" in (tmp_path / "component_properties.html").read_text()
+    assert (
+        'href="component_properties.html"' in (tmp_path / "internals.html").read_text()
+    )
+    scenarios = (tmp_path / "scenarios.html").read_text()
+    assert "1 open threat" in scenarios
+    scenario = (tmp_path / "scenario_Handle_request.html").read_text()
+    assert "1 open threat" in scenario
