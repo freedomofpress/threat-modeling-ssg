@@ -124,8 +124,14 @@ def test_threat_page_contents(tmp_path: Path) -> None:
     ):
         assert needle in page, needle
     # The risk line shows risk 9 (High x Medium) and residual risk 6 (High x Low).
-    assert 'High impact × Medium likelihood = <span class="risk-value">9</span>' in page
-    assert 'High impact × Low likelihood = <span class="risk-value">6</span>' in page
+    assert (
+        'High impact × Medium likelihood = <span class="risk"><span class="risk-value">9'
+        in page
+    )
+    assert (
+        'High impact × Low likelihood = <span class="risk"><span class="risk-value">6'
+        in page
+    )
     # The risk line comes before the details, notes, and matching rules.
     order = [
         page.index('class="risk-line"'),
@@ -182,7 +188,7 @@ def test_summary_and_matrix(tmp_path: Path) -> None:
     matrix = (tmp_path / "threats_components.html").read_text()
     # The legend also uses this class, so match the cell markup itself.
     assert '<td class="prop-cell status--partially-mitigated"' in matrix
-    assert '<span class="tag tag--text">M-SANITIZE</span>' in matrix
+    assert '<span class="tag tag--text">Sanitize input</span>' in matrix
     prop = (tmp_path / "property_reads_input.html").read_text()
     assert "threat_T-INPUT.html" in prop
 
@@ -215,11 +221,11 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
         "component_Web_app.html",
     ):
         assert escaped in (tmp_path / name).read_text(), name
-    # Inside an attribute, from a macro, and from an include.
-    assert f'title="{escaped}"' in (tmp_path / "component_Web_app.html").read_text()
-    assert (
-        f'title="{escaped}"' in (tmp_path / "scenario_Handle_request.html").read_text()
-    )
+    # Escaped in link text too, from a macro on the component page and from an include
+    # on the scenario page.
+    link = f'<a href="mitigation_M-SANITIZE.html">{escaped}</a>'
+    assert link in (tmp_path / "component_Web_app.html").read_text()
+    assert link in (tmp_path / "scenario_Handle_request.html").read_text()
 
     for page_path in tmp_path.glob("*.html"):
         page = page_path.read_text()

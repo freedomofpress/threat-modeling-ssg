@@ -10,7 +10,7 @@
 {% else %}
 <span class="cell-tip__tags">
     {% for mit in mitigations %}
-    <span class="tag tag--text">{{ mit.id }}</span>
+    <span class="tag tag--text">{{ mit.title or mit.id }}</span>
     {% endfor %}
 </span>
 {% endif %}

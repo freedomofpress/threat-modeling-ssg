@@ -173,7 +173,9 @@ def component_view(
 ) -> Iterable[dict[str, Any]]:
     analysis = model.analyze()
     for name, component in model.components.items():
-        threat_ids = sorted(analysis["components_to_threats"].get(name, set()))
+        threats = model.threats_by_risk(
+            analysis["components_to_threats"].get(name, set())
+        )
         scenario_names = list(
             dict.fromkeys(
                 s.name
@@ -186,7 +188,7 @@ def component_view(
             "model": model,
             "comp_name": name,
             "component": component,
-            "threats": threat_ids,
+            "threats": threats,
             "scenarios": scenario_names,
             "component_name": slugify(name),
         }
@@ -242,14 +244,11 @@ def property_view(
 ) -> Iterable[dict[str, Any]]:
     analysis = model.analyze()
     for prop_key, prop in model.properties.items():
-        requiring_threats = sorted(
-            (
-                (tid, t)
-                for tid, t in model.threats.items()
-                if tid in analysis["threat_counter"]
-                and prop_key in t.mapping.requirement_props
-            ),
-            key=lambda x: x[0],
+        requiring_threats = model.threats_by_risk(
+            tid
+            for tid, t in model.threats.items()
+            if tid in analysis["threat_counter"]
+            and prop_key in t.mapping.requirement_props
         )
         slug = slugify(prop_key)
         yield {
@@ -275,10 +274,27 @@ def scenario_view(
     model: ThreatModel,
 ) -> Iterable[dict[str, Any]]:
     for scenario in model.scenarios:
+        # One row per (threat, component) finding, highest risk first.
+        findings = sorted(
+            (
+                {
+                    "tid": f.threat_id,
+                    "threat": model.threats[f.threat_id],
+                    "target": f.target,
+                }
+                for f in scenario.findings
+                if f.threat_id in model.threats
+            ),
+            key=lambda row: (
+                row["threat"].risk_order,
+                scales.natural_key(row["target"]),
+            ),
+        )
         yield {
             "config": config,
             "model": model,
             "scenario": scenario,
+            "findings": findings,
             "scenario_name": slugify(scenario.name),
         }
 
@@ -376,6 +392,7 @@ def mitigation_view(
             "mitigation": mitigation,
             "threats": mitigating,
             "further_threats": proposing,
+            "status_descriptions": scales.MITIGATION_STATUSES,
         }
 
 

@@ -1019,6 +1019,10 @@ td.prop-cell[class*="status--"] {
     white-space: nowrap;
 }
 
+.risk {
+    white-space: nowrap;
+}
+
 .risk-value {
     font-family: 'Share Tech Mono', monospace;
     font-variant-numeric: tabular-nums;

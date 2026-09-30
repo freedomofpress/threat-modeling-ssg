@@ -7,8 +7,14 @@
 
 {%- endmacro %}
 
+{# A mitigation named by its title, with its id alongside for reference. #}
 {% macro mitigation_link(mitigation) -%}
-<a href="{{ mitigation.id | mitigation_href }}">{{ mitigation.id }}</a>
+<a href="{{ mitigation.id | mitigation_href }}">{{ mitigation.title or mitigation.id }}</a> <span class="ref-id">{{ mitigation.id }}</span>
+{%- endmacro %}
+
+{# Mitigations as a comma-separated list of titles, for table cells. #}
+{% macro mitigation_list(mitigations) -%}
+{% for mit in mitigations %}<a href="{{ mit.id | mitigation_href }}">{{ mit.title or mit.id }}</a>{% if not loop.last %}; {% endif %}{% endfor %}
 {%- endmacro %}
 
 {% macro risk(threat) -%}
@@ -22,6 +28,6 @@
 
 {# A risk score with its band, e.g. "9 high", or "Unknown" when a label is missing. #}
 {% macro risk_value(score) -%}
-{% if score is none %}<span class="muted">Unknown</span>{% else %}<span class="risk-value">{{ score }}</span> <span class="risk-band risk-band--{{ score | risk_band }}">{{ score | risk_band }}</span>{% endif %}
+{% if score is none %}<span class="muted">Unknown</span>{% else %}<span class="risk"><span class="risk-value">{{ score }}</span> <span class="risk-band risk-band--{{ score | risk_band }}">{{ score | risk_band }}</span></span>{% endif %}
 {%- endmacro %}
 
