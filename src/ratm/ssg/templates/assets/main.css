@@ -1119,3 +1119,48 @@ table[data-sortable] th[aria-sort="descending"] button::after { content: " \25BC
     margin-bottom: 8px;
 }
 
+/* Summary: plain totals line above the status counts. */
+.summary-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin-bottom: 24px;
+    color: var(--color-text-dim);
+}
+
+.summary-totals strong {
+    color: var(--color-text);
+    font-size: 1.3em;
+}
+
+/* The "Open" total groups unmanaged and partially mitigated threats. */
+.count-box.status-open-total {
+    background-color: var(--status-open-bg);
+    color: var(--status-open-fg);
+    border: 1px solid var(--status-open-bg);
+}
+
+.count-box.status-open-total .count-box__value,
+.count-box.status-open-total .count-box__label {
+    color: inherit;
+}
+
+/* Summary status counts: compact tiles on a grid, so every status stays on
+   one or two even rows instead of stretching a lone tile across the page. */
+.status-counts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: 10px;
+    margin-bottom: 28px;
+}
+
+.status-counts .count-box {
+    margin: 0;
+    padding: 12px 10px 30px;
+}
+
+.status-counts .count-box__value {
+    font-size: 2.4em;
+    margin-bottom: 4px;
+}
+
