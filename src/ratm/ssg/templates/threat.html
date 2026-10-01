@@ -133,14 +133,22 @@
 
 <details class="threat-matching">
     <summary>How this threat is matched</summary>
-    <p>The threat applies to every component whose properties meet all of these requirements. See the <a href="threat_rules.html">matching rules</a> for every threat.</p>
+    {% if threat.mapping.components %}
+    <p>Listed for these components. A boundary covers every component inside it.</p>
+    <div class="tag-list">
+        {% for name in threat.mapping.components %}
+        <a href="component_{{ name | slugify }}.html" class="tag tag--text">{{ name }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if threat.mapping.requirements %}
+    <p>{% if threat.mapping.components %}Also applies{% else %}Applies{% endif %} to every component whose properties meet all of these requirements. See the <a href="threat_rules.html">matching rules</a> for every threat.</p>
     <div class="tag-list">
         {% for prop in threat.mapping.requirements %}
         <a href="{{ prop | property_href }}" class="tag tag--true">{{ prop | display }}</a>
-        {% else %}
-        <em>None specified.</em>
         {% endfor %}
     </div>
+    {% endif %}
 </details>
 {% endblock %}
 
