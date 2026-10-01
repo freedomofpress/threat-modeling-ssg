@@ -1,13 +1,11 @@
 """Tests for the model code: the Ratm builders, Threat, Mitigation, and Report."""
 
 import inspect
-import json
 
 import pytest
 
 from ratm import CAPECInfo, Mitigation, Ratm, Report, Scenario, Threat, ThreatActor
-from ratm.ssg.models import Component as SiteComponent
-from ratm.ssg.models import _token_props, _token_satisfied
+from ratm.ssg.models import _token_props
 
 
 @pytest.fixture()
@@ -141,6 +139,7 @@ def test_threat_to_dict_shape() -> None:
         "requirements": ["reads_input"],
         "mitigations": ["M-SANITIZE"],
         "further_mitigations": ["M-VERIFY"],
+        "components": [],
     }
 
 
@@ -280,8 +279,7 @@ def test_source_is_the_model_code_that_called_a_helper(tm: Ratm) -> None:
         ("reads_input == is_exposed | reads_input", True),
     ],
 )
-def test_any_of_requirements_agree_across_layers(token, expected) -> None:
-    """The model code decides findings and the site re-checks tokens, so the two must agree."""
+def test_any_of_requirements(token, expected) -> None:
     tm = Ratm(load_capec_info=False)
     tm.define_properties(
         "reads_input",
@@ -292,10 +290,6 @@ def test_any_of_requirements_agree_across_layers(token, expected) -> None:
     )
     comp = tm.Component(name="C", reads_input=True, loads_resources=("deps",))
     assert bool(comp.matches(token)) is expected
-    # Go through JSON, as a real report does, so tuples become lists.
-    properties = json.loads(json.dumps(comp.to_dict()["properties"]))
-    site_comp = SiteComponent(name="C", properties=properties)
-    assert _token_satisfied(site_comp, token) is expected
 
 
 def test_any_of_threat_applies_to_either_component() -> None:
@@ -312,3 +306,72 @@ def test_any_of_threat_applies_to_either_component() -> None:
     targets = sorted(f["target"] for f in report["scenarios"][0]["findings"])
     assert targets == ["A", "B"]
     assert _token_props("element_ids.DFD1 | !other") == ["element_ids", "other"]
+
+
+# -- Threats that name their components
+
+
+@pytest.fixture()
+def nested() -> Ratm:
+    """Outer boundary > inner boundary > component, plus a component outside."""
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties("reads_input")
+    outer = tm.Boundary(name="Outer")
+    inner = tm.Boundary(name="Inner", boundary=outer)
+    tm.Component(name="Deep", boundary=inner)
+    tm.Component(name="Shallow", boundary=outer)
+    tm.Component(name="Elsewhere", reads_input=True)
+    return tm
+
+
+def findings_for(tm: Ratm, threat_id: str) -> list[str]:
+    scenario = Scenario(name="S")
+    comps = tm.components
+    scenario.Dataflow(name="f1", source=comps["Deep"], sink=comps["Shallow"])
+    scenario.Dataflow(name="f2", source=comps["Shallow"], sink=comps["Elsewhere"])
+    report = tm.Report([scenario]).generate()
+    return sorted(
+        f["target"]
+        for f in report["scenarios"][0]["findings"]
+        if f["threat_id"] == threat_id
+    )
+
+
+def test_threat_applies_to_listed_component(nested: Ratm) -> None:
+    nested.Threat("T1", components=["Shallow"])
+    assert findings_for(nested, "T1") == ["Shallow"]
+
+
+def test_listed_boundary_covers_nested_components(nested: Ratm) -> None:
+    nested.Threat("T-OUTER", components=["Outer"])
+    nested.Threat("T-INNER", components=["Inner"])
+    assert findings_for(nested, "T-OUTER") == ["Deep", "Shallow"]
+    assert findings_for(nested, "T-INNER") == ["Deep"]
+
+
+def test_listed_components_and_requirements_combine(nested: Ratm) -> None:
+    nested.Threat("T1", requirements=["reads_input"], components=["Deep"])
+    assert findings_for(nested, "T1") == ["Deep", "Elsewhere"]
+
+
+def test_report_rejects_unknown_component_name(nested: Ratm) -> None:
+    nested.Threat("T1", components=["Nowhere"])
+    with pytest.raises(ValueError, match="T1.*component.*Nowhere"):
+        findings_for(nested, "T1")
+
+
+def test_report_rejects_threat_with_nothing_to_match(nested: Ratm) -> None:
+    nested.Threat("T1")
+    with pytest.raises(ValueError, match="T1.*neither requirements nor components"):
+        findings_for(nested, "T1")
+
+
+def test_bare_report_accepts_boundary_names(nested: Ratm) -> None:
+    """Without registered components, names come from the scenario and its boundaries."""
+    threat = Threat("T1", components=["Outer"])
+    scenario = Scenario(name="S")
+    scenario.Dataflow(
+        name="f", source=nested.components["Deep"], sink=nested.components["Elsewhere"]
+    )
+    report = Report([scenario], threats=[threat]).generate()
+    assert [f["target"] for f in report["scenarios"][0]["findings"]] == ["Deep"]

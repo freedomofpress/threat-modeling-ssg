@@ -377,17 +377,19 @@ def threats_components_view(
         key=_threat_sort_key,
     )
 
-    affected: dict[str, Component] = {}
-    # Names of the components each threat applies to. A cell is filled when the
-    # component is in its threat's set.
-    applies: dict[str, set[str]] = {}
-    for tid, threat in active_threats:
-        applies[tid] = set()
-        for comp_name, comp in model.components.items():
-            if not threat.applies_to(comp):
-                continue
-            affected[comp_name] = comp
-            applies[tid].add(comp_name)
+    # Names of the components each threat applies to, from the findings, so listed
+    # components and requirement matches both count. A cell is filled when the component
+    # is in its threat's set.
+    applies: dict[str, set[str]] = {
+        tid: set(analysis["threats_to_components"].get(tid, set()))
+        for tid, _ in active_threats
+    }
+    affected: dict[str, Component] = {
+        name: model.components[name]
+        for names in applies.values()
+        for name in names
+        if name in model.components
+    }
 
     sorted_components = sorted(
         affected.items(), key=lambda x: (x[1].component_class, x[0])

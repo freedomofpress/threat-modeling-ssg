@@ -34,6 +34,8 @@ class ThreatMapping(BaseModel):
     # Mitigation ids. Look them up in ThreatModel.mitigations.
     mitigations: list[str] = []
     further_mitigations: list[str] = []
+    # Components and boundaries the threat is listed for, by name.
+    components: list[str] = []
 
     @property
     def requirement_props(self) -> set[str]:
@@ -142,12 +144,6 @@ class Threat(BaseModel):
     def is_capec(self) -> bool:
         return self.SID.startswith("CAPEC-")
 
-    def applies_to(self, component: "Component") -> bool:
-        """True if the component has all the requirement properties for this threat."""
-        return bool(self.mapping.requirements) and all(
-            _token_satisfied(component, tok) for tok in self.mapping.requirements
-        )
-
 
 class Component(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -217,30 +213,6 @@ def _token_props(token: str) -> list[str]:
             left, right = token.split(operator, 1)
             return [left.strip(), right.strip()]
     return [token.removeprefix("!").split(".", 1)[0]]
-
-
-def _token_satisfied(component: Component, token: str) -> bool:
-    """Check if a single requirement/mitigation token is satisfied by the component.
-
-    Mirrors ComponentProperties.matches() on the report side: negation ('!is_exposed'),
-    comparison ('requires_credentials != uses_strong_credentials'), sub-resources
-    ('verifies_resources.deps'), plain truthiness ('is_physical') and any-of
-    ('element_ids.DFD1 | element_ids.DFD2'), which is split first."""
-    if "|" in token:
-        return any(_token_satisfied(component, part) for part in token.split("|"))
-    token = token.strip()
-    if token.startswith("!"):
-        return not _token_satisfied(component, token[1:])
-    for operator in ("!=", "=="):
-        if operator in token:
-            left, right = (part.strip() for part in token.split(operator, 1))
-            equal = component.properties.get(left) == component.properties.get(right)
-            return not equal if operator == "!=" else equal
-    if "." in token:
-        prop, item = token.split(".", 1)
-        value = component.properties.get(prop)
-        return item in value if isinstance(value, list) else bool(value)
-    return bool(component.properties.get(token))
 
 
 def source_url(config: SiteConfig, source: SourceRef | None) -> str | None:

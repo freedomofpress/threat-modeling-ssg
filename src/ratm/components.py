@@ -189,6 +189,16 @@ class Component:
         changes = self.properties.to_nondefault_dict()
         return dataclasses.replace(boundary_properties, **changes)
 
+    @property
+    def enclosing_names(self) -> list[str]:
+        """This component's name, then each boundary around it, innermost first."""
+        names, seen, current = [], set(), self
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            names.append(current.name)
+            current = current.boundary
+        return names
+
     def matches(self, expr: str):
         combined = self.combined_properties
         if combined:
@@ -350,10 +360,15 @@ class ThreatActor:
 
 @dataclass
 class Threat:
-    """The requirements, mitigations, and risk information for a threat."""
+    """The requirements, mitigations, and risk information for a threat.
+
+    A threat applies to the components named in `components` (a boundary covers
+    everything inside it, at any depth) and to every component whose properties meet all
+    of its `requirements`.
+    """
 
     id: str
-    requirements: list[str]
+    requirements: list[str] = dataclasses.field(default_factory=list)
     mitigations: list[str] = dataclasses.field(default_factory=list)
     capec_info: CAPECInfo = None
     comment: str = None
@@ -366,6 +381,7 @@ class Threat:
     further_mitigations: list[str] = dataclasses.field(default_factory=list)
     children: list[str] = dataclasses.field(default_factory=list)
     threat_actors: list[str] = dataclasses.field(default_factory=list)
+    components: list[str] = dataclasses.field(default_factory=list)
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
 
     def __post_init__(self):
@@ -420,14 +436,13 @@ class Threat:
         self.capec_info = CAPECInfo.from_capec_entry(entry)
 
     def matches(self, component: Component):
+        """True if the component is listed (directly or through a boundary around it) or
+        meets every requirement."""
+        if self.components and set(component.enclosing_names) & set(self.components):
+            return True
         if not self.requirements:
-            raise ValueError(f"Threat {self} does not have requirements")
-
-        for req in self.requirements:
-            if not component.matches(req):
-                return False
-
-        return True
+            return False
+        return all(component.matches(req) for req in self.requirements)
 
     def to_dict(self):
         info = self.capec_info.to_dict() if self.capec_info else CAPECInfo("").to_dict()
@@ -445,6 +460,7 @@ class Threat:
         info["mapping"]["requirements"] = self.requirements
         info["mapping"]["mitigations"] = list(self.mitigations)
         info["mapping"]["further_mitigations"] = list(self.further_mitigations)
+        info["mapping"]["components"] = list(self.components)
         info["source"] = _source_dict(self.source)
         return info
 

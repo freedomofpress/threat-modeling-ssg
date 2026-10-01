@@ -50,6 +50,11 @@ class Report:
         threat_ids = _unique_ids("threat", [t.id for t in self.threats])
         mitigation_ids = _unique_ids("mitigation", [m.id for m in self.mitigations])
         actor_names = _unique_ids("threat actor", [a.name for a in self.threat_actors])
+        # Registered components, plus every boundary around them, so a report built from
+        # scenarios alone still knows its boundaries.
+        component_names = {
+            name for comp in self.components for name in comp.enclosing_names
+        }
 
         for mit in self.mitigations:
             if mit.status not in scales.MITIGATION_STATUSES:
@@ -59,6 +64,11 @@ class Report:
 
         for threat in self.threats:
             prefix = f"Threat {threat.id}"
+            if not threat.requirements and not threat.components:
+                raise ValueError(f"{prefix} has neither requirements nor components")
+            for name in threat.components:
+                if name not in component_names:
+                    raise ValueError(f"{prefix} refers to unknown component '{name}'")
             if threat.status not in scales.THREAT_STATUSES:
                 raise ValueError(f"{prefix} has unknown status '{threat.status}'")
             _check_label(prefix, "impact", threat.impact_label, scales.IMPACT_SCORES)

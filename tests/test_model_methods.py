@@ -12,7 +12,6 @@ from ratm.ssg.models import (
     ThreatMapping,
     ThreatModel,
     _token_props,
-    _token_satisfied,
 )
 
 
@@ -174,33 +173,6 @@ def test_property_requiring_threats(model_factory) -> None:
         and "loads_resources" in t.mapping.requirement_props
     ]
     assert requiring == ["T-active"]
-
-
-@pytest.mark.parametrize(
-    ("token", "expected"),
-    [
-        ("is_exposed", True),
-        ("!is_exposed", False),
-        ("encrypts_secrets", False),
-        ("!encrypts_secrets", True),
-        ("loads_resources.deps", True),
-        ("loads_resources.source", False),
-        ("!loads_resources.source", True),
-        ("requires_credentials == uses_strong_credentials", False),
-        ("requires_credentials != uses_strong_credentials", True),
-    ],
-)
-def test_token_satisfied(token, expected) -> None:
-    component = Component(
-        name="A",
-        component_class="Process",
-        properties={
-            "is_exposed": True,
-            "loads_resources": ["deps"],
-            "requires_credentials": True,
-        },
-    )
-    assert _token_satisfied(component, token) is expected
 
 
 @pytest.mark.parametrize(
