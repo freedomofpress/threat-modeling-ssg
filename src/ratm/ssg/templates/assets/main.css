@@ -606,6 +606,8 @@ th.prop-col .cell-tip {
     .node rect { fill: var(--color-bg-header); stroke: var(--color-text-dim); }
     .node text { fill: var(--color-text); }
 
+    .node.tagged text { fill: var(--color-text-dim); }
+
     .node.highlighted ellipse,
     .node.highlighted polygon,
     .node.highlighted rect { fill: #c0392b; stroke: #c0392b; }
@@ -1012,6 +1014,23 @@ td.prop-cell[class*="status--"] {
 }
 
 /* A threat or mitigation named by its title, with the id alongside. */
+/* A tag such as "Legacy" after a name. A muted pill, so it never reads as a
+   status badge. */
+.item-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 7px;
+    border: 1px solid var(--color-text-dim);
+    border-radius: 999px;
+    color: var(--color-text-dim);
+    font-size: 0.75rem;
+    font-weight: normal;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
 .ref-id {
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.8em;

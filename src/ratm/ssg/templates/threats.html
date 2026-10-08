@@ -25,7 +25,7 @@
     </label>
     {% endif %}
     <label>Search
-        <input type="search" name="q" id="register-search" placeholder="Title, id, or component">
+        <input type="search" name="q" id="register-search" placeholder="Title, id, component, or tag">
     </label>
     <output class="table-count" data-count-for="register">{{ rows | length }} threats</output>
 </form>
@@ -49,7 +49,7 @@
         {% set t = row.threat %}
         <tr data-status="{{ t.status }}{% if t.is_open %}|open{% endif %}"
             data-actor="{{ t.threat_actors | join('|') }}"
-            data-q="{{ [row.tid, t.description, row.components | join(' ')] | join(' ') | lower }}"
+            data-q="{{ [row.tid, t.description, row.components | join(' '), t.tags | join(' ')] | join(' ') | lower }}"
             data-sort-id="{{ id_rank[row.tid] }}"
             data-sort-status="{{ status_rank[t.status] | default(99) }}"
             data-sort-impact="{{ impact_scores.get(t.impact_label, 0) }}"

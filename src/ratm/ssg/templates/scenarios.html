@@ -11,7 +11,7 @@
 {% set summary = summaries[scenario.name] %}
 <section class="scenario-list-item">
     <h2>
-        <a href="scenario_{{ slug }}.html">{{ scenario.name }}</a>
+        <a href="scenario_{{ slug }}.html">{{ scenario.name }}</a>{{ m.tag_badges(scenario.tags) }}
     </h2>
     {% if scenario.description %}<p><small>{{ scenario.description }}</small></p>{% endif %}
     <p>{{ m.open_risk_line(summary) }}</p>

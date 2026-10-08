@@ -24,7 +24,7 @@
     <tbody>
         {% for row in group.members %}
         <tr>
-            <td><a href="component_{{ row.name | slugify }}.html">{{ row.name }}</a>{% if row.component.description %}<div class="prop-meta">{{ row.component.description }}</div>{% endif %}</td>
+            <td><a href="component_{{ row.name | slugify }}.html">{{ row.name }}</a>{{ m.tag_badges(row.component.tags) }}{% if row.component.description %}<div class="prop-meta">{{ row.component.description }}</div>{% endif %}</td>
             <td>{{ row.component.inBoundary or "" }}</td>
             <td>{{ row.open or "" }}</td>
             <td>{% if row.top_risk %}{{ m.risk_value(row.top_risk) }}{% endif %}</td>

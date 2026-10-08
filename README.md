@@ -48,12 +48,15 @@ Risk is impact times likelihood, from 1 to 12: 1–3 is low, 4–6 medium, and 8
 
 **Threat actors** (`tm.ThreatActor(name, description=...)`) must be registered before a threat can name them.
 
+**Tags** label parts of the model, for example the pieces of an older setup that is kept for comparison. Components, actors, boundaries, scenarios, threats, and mitigations take `tags=["Legacy"]`. The site shows each tag as a badge next to the item's name and draws tagged components dashed in the diagrams. A threat also gets the tags shared by every component it is found on, and a mitigation gets the tags shared by every threat that lists it. Tags are labels only. They do not change which threats apply or how risk is counted.
+
 Generating the report fails with an error naming the problem when:
 
 - a threat names an unknown component, mitigation, threat actor, or child threat, lists itself as a child, or has neither components nor requirements
 - a status is not one of the values above
 - an impact or likelihood is given but is not on its scale
 - two threats, mitigations, or threat actors share an id or name
+- `tags` is not a list of non-empty strings
 
 ## The generated site
 

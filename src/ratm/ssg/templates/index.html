@@ -58,7 +58,7 @@
 <h2>Scenarios <a href="scenarios.html" class="section-link">See all scenarios →</a></h2>
 <ul>
     {% for scenario in model.scenarios %}
-    <li><a href="scenario_{{ scenario.name | slugify }}.html">{{ scenario.name }}</a>{% if scenario.description %} <span class="muted">{{ scenario.description }}</span>{% endif %}</li>
+    <li><a href="scenario_{{ scenario.name | slugify }}.html">{{ scenario.name }}</a>{{ m.tag_badges(scenario.tags) }}{% if scenario.description %} <span class="muted">{{ scenario.description }}</span>{% endif %}</li>
     {% endfor %}
 </ul>
 {% endblock %}
