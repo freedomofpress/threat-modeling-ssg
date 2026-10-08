@@ -1,11 +1,12 @@
 """Tests for the model code: the Ratm builders, Threat, Mitigation, and Report."""
 
 import inspect
+import json
 
 import pytest
 
 from ratm import CAPECInfo, Mitigation, Ratm, Report, Scenario, Threat, ThreatActor
-from ratm.ssg.models import _token_props
+from ratm.ssg.models import ThreatModel, _token_props
 
 
 @pytest.fixture()
@@ -405,3 +406,10 @@ def test_report_rejects_a_string_as_tags(tm: Ratm) -> None:
     tm.Threat("T1", requirements=["reads_input"], tags="Legacy")
     with pytest.raises(ValueError, match="T1.*tags"):
         tm.Report([make_scenario(tm)]).generate()
+
+
+def test_scenario_without_description_loads_on_the_site(tm: Ratm) -> None:
+    tm.Threat("T1", requirements=["reads_input"])
+    report = tm.Report([make_scenario(tm)]).generate()
+    assert report["scenarios"][0]["description"] == ""
+    ThreatModel.model_validate(json.loads(json.dumps(report)))
