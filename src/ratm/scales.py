@@ -56,7 +56,8 @@ def risk_score(impact: str | None, likelihood: str | None) -> int | None:
     return IMPACT_SCORES[impact] * LIKELIHOOD_SCORES[likelihood]
 
 
-# Bands for risk scores. The only possible scores are 1, 2, 3, 4, 6, 8, 9, and 12.
+# Score ranges for the low, medium, and high risk levels. The only possible scores are
+# 1, 2, 3, 4, 6, 8, 9, and 12.
 RISK_BANDS = (("low", 1, 3), ("medium", 4, 6), ("high", 8, 12))
 
 

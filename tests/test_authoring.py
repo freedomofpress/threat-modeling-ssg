@@ -170,7 +170,8 @@ def test_report_emits_entities_and_all_findings(tm: Ratm) -> None:
         "Well-resourced adversary"
     )
     targets = sorted(f["target"] for f in report["scenarios"][0]["findings"])
-    # A sanitizes its input but the finding is still reported.
+    # Component A has sanitizes_input, but the threat is still reported for it, because
+    # mitigations don't remove findings.
     assert targets == ["A", "B"]
 
 
@@ -313,7 +314,8 @@ def test_any_of_threat_applies_to_either_component() -> None:
 
 @pytest.fixture()
 def nested() -> Ratm:
-    """Outer boundary > inner boundary > component, plus a component outside."""
+    """A component inside an inner boundary inside an outer boundary, plus a component
+    outside both."""
     tm = Ratm(load_capec_info=False)
     tm.define_properties("reads_input")
     outer = tm.Boundary(name="Outer")

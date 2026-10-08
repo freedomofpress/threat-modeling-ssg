@@ -203,7 +203,7 @@ class Property(BaseModel):
 
 
 def _token_props(token: str) -> list[str]:
-    """The property names a requirement/mitigation token refers to."""
+    """The property names that one requirement refers to."""
     if "|" in token:
         names = [name for part in token.split("|") for name in _token_props(part)]
         return list(dict.fromkeys(names))

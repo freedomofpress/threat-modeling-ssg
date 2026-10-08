@@ -241,7 +241,7 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
     for page_path in tmp_path.glob("*.html"):
         page = page_path.read_text()
         assert "<b>" not in page, page_path.name
-        # Double escaping, or macro output escaped as text.
+        # Text escaped twice, or HTML from a macro shown as literal text.
         for needle in ("&amp;amp;", "&amp;#34;", "&lt;span", "&lt;a "):
             assert needle not in page, (page_path.name, needle)
 
