@@ -82,6 +82,14 @@ def generate_dataflow(scenario: Scenario, components: dict[str, Component]) -> s
         _id = node_id(comp)
         shape = NODE_SHAPES.get(comp.component_class, "circle")
         label = wrap_label(dot_string(comp.name))
+        # Tagged components (for example legacy ones) are drawn dashed, and the "tagged"
+        # class lets the stylesheet mute them.
+        tagged = (
+            [f'{indent}    style = "dashed";', f'{indent}    class = "tagged";']
+            if comp.tags
+            else []
+        )
+        tooltip = comp.name + "".join(f" ({tag})" for tag in comp.tags)
         lines.extend(
             [
                 f"{indent}{_id} [",
@@ -90,8 +98,9 @@ def generate_dataflow(scenario: Scenario, components: dict[str, Component]) -> s
                 f"{indent}    fontcolor = black;",
                 f'{indent}    label = "{label}";',
                 f'{indent}    URL = "component_{slug(comp.name)}.html";',
-                f'{indent}    tooltip = "{dot_string(comp.name)}";',
+                f'{indent}    tooltip = "{dot_string(tooltip)}";',
                 f"{indent}    margin = 0.02;",
+                *tagged,
                 f"{indent}]",
                 "",
             ]
@@ -201,12 +210,17 @@ def generate_highlighted_dataflow(dfd: str, highlight_components: set) -> str:
         if label and label in highlight_components:
             indent_match = re.search(r"^(\s+)\S", attrs, re.MULTILINE)
             indent = indent_match.group(1) if indent_match else "        "
+            # Keep a tagged node's dashed outline and class when highlighting.
+            tagged = 'class = "tagged";' in attrs
+            attrs = re.sub(r'\n\s*(?:style|class) = "[^"]*";', "", attrs)
             stripped = attrs.rstrip()
             trailing = attrs[len(stripped) :]
+            style = "filled,dashed" if tagged else "filled"
+            css_class = "tagged highlighted" if tagged else "highlighted"
             attrs = (
-                f'{stripped}\n{indent}style = "filled";\n'
+                f'{stripped}\n{indent}style = "{style}";\n'
                 f'{indent}fillcolor = "#c0392b";\n{indent}fontcolor = "white";\n'
-                f'{indent}class = "highlighted";{trailing}'
+                f'{indent}class = "{css_class}";{trailing}'
             )
         return f"{node_id} [{attrs}]"
 

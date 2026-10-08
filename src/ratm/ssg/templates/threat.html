@@ -7,7 +7,7 @@
 {% block content %}
 <h1 class="threat-title">
     {{ threat.description or threat_id }}
-    {{ m.status_badge(threat.status) }}
+    {{ m.status_badge(threat.status) }}{{ m.tag_badges(threat.tags) }}
 </h1>
 <p class="threat-id">
     {% if threat.is_capec %}<a href="https://capec.mitre.org/data/definitions/{{ threat_id.replace('CAPEC-', '') }}.html">{{ threat_id }}</a>{% else %}{{ threat_id }}{% endif %}
@@ -100,7 +100,7 @@
     {% for comp_name in components %}
     {% set comp = model.components.get(comp_name) %}
     <li>
-        <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>
+        <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>{% if comp %}{{ m.tag_badges(comp.tags) }}{% endif %}
         {% if comp and comp.inBoundary %}<span class="prop-meta">{{ comp.inBoundary }}</span>{% endif %}
     </li>
     {% endfor %}
@@ -108,7 +108,7 @@
 {% for item in threat_scenario_data %}
 <details class="scenario-details">
     <summary>
-        <a href="scenario_{{ item.scenario.name | slugify }}.html">{{ item.scenario.name }}</a>
+        <a href="scenario_{{ item.scenario.name | slugify }}.html">{{ item.scenario.name }}</a>{{ m.tag_badges(item.scenario.tags) }}
         <span class="affected-components-inline">
             · {{ item.affected_components | join(", ") }}
         </span>

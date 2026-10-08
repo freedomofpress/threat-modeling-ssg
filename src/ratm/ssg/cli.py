@@ -86,7 +86,7 @@ def main(output_dir):
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    model.prepare_scenarios(config)
+    model.prepare_site(config)
 
     copy_assets(output_dir / "assets")
 

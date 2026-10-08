@@ -48,6 +48,7 @@ def test_mitigation_to_dict() -> None:
         "description": "",
         "status": "implemented",
         "source": {"file": "model.py", "line": 3},
+        "tags": [],
     }
 
 
@@ -377,3 +378,30 @@ def test_bare_report_accepts_boundary_names(nested: Ratm) -> None:
     )
     report = Report([scenario], threats=[threat]).generate()
     assert [f["target"] for f in report["scenarios"][0]["findings"]] == ["Deep"]
+
+
+# -- Tags
+
+
+def test_tags_are_emitted(tm: Ratm) -> None:
+    old = tm.Boundary(name="Old area", tags=["Legacy"])
+    a = tm.Component(name="A", boundary=old, reads_input=True, tags=["Legacy"])
+    who = tm.Actor(name="Who")
+    scenario = Scenario(name="S1", tags=["Legacy"])
+    scenario.Dataflow(name="Who to A", source=who, sink=a)
+    tm.Mitigation("M-OLD", title="Old control", tags=["Legacy"])
+    tm.Threat("T1", requirements=["reads_input"], tags=["Legacy"])
+    report = tm.Report([scenario]).generate()
+    assert report["components"]["A"]["tags"] == ["Legacy"]
+    assert report["components"]["Old area"]["tags"] == ["Legacy"]
+    assert report["components"]["Who"]["tags"] == []
+    assert report["scenarios"][0]["tags"] == ["Legacy"]
+    assert report["mitigations"]["M-OLD"]["tags"] == ["Legacy"]
+    assert report["threats"][0]["tags"] == ["Legacy"]
+
+
+def test_report_rejects_a_string_as_tags(tm: Ratm) -> None:
+    # A bare string would otherwise become one tag per character.
+    tm.Threat("T1", requirements=["reads_input"], tags="Legacy")
+    with pytest.raises(ValueError, match="T1.*tags"):
+        tm.Report([make_scenario(tm)]).generate()

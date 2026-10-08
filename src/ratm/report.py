@@ -56,6 +56,15 @@ class Report:
             name for comp in self.components for name in comp.enclosing_names
         }
 
+        for kind, items, key in (
+            ("Component", self.components, "name"),
+            ("Scenario", self.scenarios, "name"),
+            ("Threat", self.threats, "id"),
+            ("Mitigation", self.mitigations, "id"),
+        ):
+            for item in items:
+                _check_tags(f"{kind} {getattr(item, key)}", item.tags)
+
         for mit in self.mitigations:
             if mit.status not in scales.MITIGATION_STATUSES:
                 raise ValueError(
@@ -124,3 +133,10 @@ def _unique_ids(kind: str, ids: list[str]) -> set[str]:
 def _check_label(prefix: str, field: str, value: str | None, scale: dict) -> None:
     if value is not None and value not in scale:
         raise ValueError(f"{prefix} has unknown {field} '{value}'")
+
+
+def _check_tags(prefix: str, tags) -> None:
+    if not isinstance(tags, (list, tuple)) or not all(
+        isinstance(tag, str) and tag for tag in tags
+    ):
+        raise ValueError(f"{prefix} tags must be a list of non-empty strings")

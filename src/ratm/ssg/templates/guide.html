@@ -62,4 +62,7 @@
 
 <h2 id="matching">Where threats apply</h2>
 <p>Each component has properties, such as whether it is exposed to the network. A threat applies to every component whose properties meet all of its requirements. Scenarios show those components in context. The <a href="internals.html">model internals</a> pages show the rules themselves.</p>
+
+<h2 id="tags">Tags</h2>
+<p>A label such as <span class="item-tag">Legacy</span> next to a name is a tag set by the model's authors, for example to mark parts of an older setup. Components with a tag are drawn with a dashed outline in the diagrams. A threat carries a tag when every component it applies to has that tag, and a mitigation carries a tag when every threat that lists it does. Tags do not change which threats apply or how risk is counted.</p>
 {% endblock %}

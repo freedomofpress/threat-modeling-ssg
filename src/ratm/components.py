@@ -156,6 +156,9 @@ class Component:
     properties: ComponentProperties = None
     type: str = "Component"
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    # Labels shown next to the item on the site, such as "Legacy". Threats and
+    # mitigations also get the tags shared by everything they apply to.
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
@@ -212,6 +215,7 @@ class Component:
             "name": self.name,
             "properties": self.combined_properties.to_nondefault_dict(),
             "source": _source_dict(self.source),
+            "tags": list(self.tags),
         }
 
 
@@ -323,6 +327,7 @@ class Mitigation:
     status: str = scales.DEFAULT_MITIGATION_STATUS
 
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
@@ -335,6 +340,7 @@ class Mitigation:
             "description": self.description or "",
             "status": self.status,
             "source": _source_dict(self.source),
+            "tags": list(self.tags),
         }
 
 
@@ -383,6 +389,7 @@ class Threat:
     threat_actors: list[str] = dataclasses.field(default_factory=list)
     components: list[str] = dataclasses.field(default_factory=list)
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
@@ -462,6 +469,7 @@ class Threat:
         info["mapping"]["further_mitigations"] = list(self.further_mitigations)
         info["mapping"]["components"] = list(self.components)
         info["source"] = _source_dict(self.source)
+        info["tags"] = list(self.tags)
         return info
 
 
@@ -482,6 +490,7 @@ class Scenario:
     description: str = None
     findings: list[Finding] | None = None
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
@@ -492,7 +501,12 @@ class Scenario:
         for flow in self.dataflows:
             if flow.labels and label in flow.labels:
                 new_flows.append(flow)
-        return self.__class__(name=name, dataflows=new_flows, description=description)
+        return self.__class__(
+            name=name,
+            dataflows=new_flows,
+            description=description,
+            tags=list(self.tags),
+        )
 
     def iter_components(self):
         """Iterate the components referenced by a scenario."""
@@ -523,6 +537,7 @@ class Scenario:
             "name": self.name,
             "flows": [f.to_dict() for f in self.dataflows],
             "findings": [dataclasses.asdict(f) for f in self.findings],
+            "tags": list(self.tags),
         }
 
     def Dataflow(self, dataflow_cls=Dataflow, *args, **kwargs):

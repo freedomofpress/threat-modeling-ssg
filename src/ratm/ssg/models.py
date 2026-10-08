@@ -52,6 +52,7 @@ class Mitigation(BaseModel):
     description: str = ""
     status: str = scales.DEFAULT_MITIGATION_STATUS
     source: SourceRef | None = None
+    tags: list[str] = []
 
 
 class ThreatActor(BaseModel):
@@ -76,6 +77,7 @@ class Threat(BaseModel):
     children: list[str] = []
     mapping: ThreatMapping = Field(default_factory=ThreatMapping)
     source: SourceRef | None = None
+    tags: list[str] = []
 
     @property
     def impact_label(self) -> str:
@@ -153,6 +155,7 @@ class Component(BaseModel):
     inBoundary: str | None = Field(alias="in_boundary", default=None)
     properties: dict[str, Any] = {}
     source: SourceRef | None = None
+    tags: list[str] = []
     _key: str | None = PrivateAttr(default=None)
 
     def get_property(self, name):
@@ -184,6 +187,7 @@ class Scenario(BaseModel):
     dfd: str = ""
     mermaid: str = ""
     url: str | None = None
+    tags: list[str] = []
 
     @property
     def source(self) -> SourceRef | None:
@@ -213,6 +217,18 @@ def _token_props(token: str) -> list[str]:
             left, right = token.split(operator, 1)
             return [left.strip(), right.strip()]
     return [token.removeprefix("!").split(".", 1)[0]]
+
+
+def _shared_tags(tag_lists: Iterable[list[str]]) -> list[str]:
+    """The tags present in every list, in the first list's order, or [] if none."""
+    tag_lists = list(tag_lists)
+    if not tag_lists:
+        return []
+    return [tag for tag in tag_lists[0] if all(tag in tags for tags in tag_lists)]
+
+
+def _merge_tags(own: list[str], extra: list[str]) -> list[str]:
+    return [*own, *(tag for tag in extra if tag not in own)]
 
 
 def source_url(config: SiteConfig, source: SourceRef | None) -> str | None:
@@ -268,6 +284,41 @@ class ThreatModel(BaseModel):
                 scenario.url = source_url(config, scenario.source)
             scenario.dfd = generate_dataflow(scenario, self.components)
             scenario.mermaid = generate_sequence(scenario)
+
+    def prepare_site(self, config: SiteConfig) -> None:
+        """Get the model ready to render by building the diagrams and resolving tags."""
+        self.prepare_scenarios(config)
+        self.resolve_tags()
+
+    def resolve_tags(self) -> None:
+        """Add inherited tags to threats and mitigations.
+
+        A threat gets the tags shared by every component it is found on, and a
+        mitigation gets the tags shared by every threat that lists it. An item found on
+        nothing, or listed by no threat, keeps only its own tags.
+        """
+        found_on = self.analyze()["threats_to_components"]
+        for tid, threat in self.threats.items():
+            components = [self.components.get(name) for name in found_on.get(tid, ())]
+            shared = _shared_tags(comp.tags if comp else [] for comp in components)
+            threat.tags = _merge_tags(threat.tags, shared)
+        for mid, mitigation in self.mitigations.items():
+            listing = [
+                threat
+                for threat in self.threats.values()
+                if mid in threat.mapping.mitigations
+                or mid in threat.mapping.further_mitigations
+            ]
+            shared = _shared_tags(threat.tags for threat in listing)
+            mitigation.tags = _merge_tags(mitigation.tags, shared)
+
+    def component_tags(self, name: str) -> list[str]:
+        component = self.components.get(name)
+        return component.tags if component else []
+
+    def scenario_tags(self, name: str) -> list[str]:
+        scenario = self.scenario_by_name().get(name)
+        return scenario.tags if scenario else []
 
     def scenario_by_name(self) -> dict[str, Scenario]:
         if self._scenario_by_name is None:

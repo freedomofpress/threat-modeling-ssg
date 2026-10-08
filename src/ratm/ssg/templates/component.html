@@ -4,7 +4,7 @@
 {% block title %}{{ comp_name }} - Threat Model{% endblock %}
 
 {% block content %}
-<h1>Component: {{ comp_name }}</h1>
+<h1>Component: {{ comp_name }}{{ m.tag_badges(component.tags) }}</h1>
 {% if component.source %}<p class="threat-id">{{ m.defined_in(config, component.source) }}</p>{% endif %}
 
 <p>{{ component.description }}</p>
@@ -52,7 +52,7 @@
 {% if scenarios %}
 <ul>
     {% for scenario_name in scenarios %}
-    <li><a href="scenario_{{ scenario_name | slugify }}.html">{{ scenario_name }}</a></li>
+    <li><a href="scenario_{{ scenario_name | slugify }}.html">{{ scenario_name }}</a>{{ m.tag_badges(model.scenario_tags(scenario_name)) }}</li>
     {% endfor %}
 </ul>
 {% else %}

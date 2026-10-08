@@ -445,3 +445,71 @@ def test_open_risk_summary() -> None:
         "top_risk": 6,
     }
     assert model.open_risk(["T3"]) == {"total": 1, "open": 0, "top_risk": None}
+
+
+# -- Tags
+
+
+def tagged_model(model_factory, threat_components):
+    """A model where A and B are tagged "Legacy", C is not, and threat Tn is found on
+    the components listed for it in threat_components."""
+    components = {
+        "A": Component(name="A", tags=["Legacy"]),
+        "B": Component(name="B", tags=["Legacy", "Lab"]),
+        "C": Component(name="C"),
+    }
+    findings = [
+        Finding(target=comp, threat_id=tid)
+        for tid, comps in threat_components.items()
+        for comp in comps
+    ]
+    flows = [
+        Flow(id="1", name="A to B", source="A", sink="B"),
+        Flow(id="2", name="B to C", source="B", sink="C"),
+    ]
+    threats = {tid: Threat(SID=tid) for tid in threat_components}
+    return model_factory(
+        threats=threats,
+        components=components,
+        scenarios=[Scenario(name="S1", flows=flows, findings=findings)],
+    )
+
+
+def test_threat_takes_the_tags_all_its_components_share(model_factory) -> None:
+    model = tagged_model(model_factory, {"T1": ["A", "B"], "T2": ["A", "C"]})
+    model.resolve_tags()
+    assert model.threats["T1"].tags == ["Legacy"]
+    assert model.threats["T2"].tags == []
+
+
+def test_threat_keeps_its_own_tags(model_factory) -> None:
+    model = tagged_model(model_factory, {"T1": ["C"], "T2": []})
+    model.threats["T1"].tags = ["Legacy"]
+    model.threats["T2"].tags = ["Lab"]
+    model.resolve_tags()
+    assert model.threats["T1"].tags == ["Legacy"]
+    # Found on no component, so nothing is inherited.
+    assert model.threats["T2"].tags == ["Lab"]
+
+
+def test_mitigation_takes_the_tags_all_its_threats_share(model_factory) -> None:
+    model = tagged_model(model_factory, {"T1": ["A"], "T2": ["B"], "T3": ["C"]})
+    model.threats["T1"].mapping.mitigations = ["M-OLD", "M-BOTH"]
+    model.threats["T2"].mapping.further_mitigations = ["M-OLD"]
+    model.threats["T3"].mapping.mitigations = ["M-BOTH"]
+    model.mitigations = {
+        "M-OLD": Mitigation(id="M-OLD"),
+        "M-BOTH": Mitigation(id="M-BOTH"),
+        "M-UNUSED": Mitigation(id="M-UNUSED"),
+    }
+    model.resolve_tags()
+    assert model.mitigations["M-OLD"].tags == ["Legacy"]
+    assert model.mitigations["M-BOTH"].tags == []
+    assert model.mitigations["M-UNUSED"].tags == []
+
+
+def test_resolve_tags_twice_gives_the_same_tags(model_factory) -> None:
+    model = tagged_model(model_factory, {"T1": ["A", "B"]})
+    model.resolve_tags()
+    model.resolve_tags()
+    assert model.threats["T1"].tags == ["Legacy"]

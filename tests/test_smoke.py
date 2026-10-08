@@ -80,7 +80,7 @@ def author_model() -> dict:
 def render(report: dict, out: Path) -> ThreatModel:
     model = ThreatModel.model_validate(json.loads(json.dumps(report)))
     config = SiteConfig(title="Smoke")
-    model.prepare_scenarios(config)
+    model.prepare_site(config)
     render_views(build_env(), out, {"config": config, "model": model})
     return model
 
@@ -362,7 +362,7 @@ def test_pages_link_to_source(tmp_path: Path) -> None:
     report = author_model()
     model = ThreatModel.model_validate(json.loads(json.dumps(report)))
     config = SiteConfig(github_repo="https://example.org/ratm", github_branch="dev")
-    model.prepare_scenarios(config)
+    model.prepare_site(config)
     render_views(build_env(), tmp_path, {"config": config, "model": model})
     base = "https://example.org/ratm/blob/dev/tests/test_smoke.py#L"
     for name in (
@@ -402,3 +402,43 @@ def test_listed_components_show_on_threat_page_and_matrix(tmp_path: Path) -> Non
     assert matrix.count('<td class="prop-cell status--') == 1
     # The matching-rules grid renders a group with no property columns.
     assert "T-LISTED" in (tmp_path / "threat_rules.html").read_text()
+
+
+def test_tags_show_as_badges_and_dashed_nodes(tmp_path: Path) -> None:
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties("reads_input")
+    tm.Mitigation("M-OLD", title="Old control")
+    tm.Threat("T-OLD", components=["Old box"], mitigations=["M-OLD"])
+    tm.Threat("T-NEW", requirements=["reads_input"])
+    old = tm.Component(name="Old box", tags=["Legacy"])
+    new = tm.Component(name="New box", reads_input=True)
+    scenario = Scenario(name="Old way", description="Before", tags=["Legacy"])
+    scenario.Dataflow(name="Hand over", source=new, sink=old)
+    render(tm.Report([scenario]).generate(), tmp_path)
+
+    badge = '<span class="item-tag">Legacy</span>'
+    for page in ("component_Old_box.html", "threats.html", "mitigation_M-OLD.html"):
+        assert badge in (tmp_path / page).read_text(), page
+    # Only the legacy component and the threat found only on it are tagged.
+    for page in ("component_New_box.html", "threat_T-NEW.html"):
+        text = (tmp_path / page).read_text()
+        # The page heading, after the site title's <h1>.
+        start = text.index("<h1", text.index("</h1>"))
+        heading = text[start : text.index("</h1>", start)]
+        assert "item-tag" not in heading, page
+    for page in ("component_Old_box.html", "threat_T-OLD.html"):
+        text = (tmp_path / page).read_text()
+        start = text.index("<h1", text.index("</h1>"))
+        assert "item-tag" in text[start : text.index("</h1>", start)], page
+    # The register and mitigation searches match tags.
+    register = (tmp_path / "threats.html").read_text()
+    row = register[register.index('href="threat_T-OLD.html"') - 600 :]
+    assert 'data-q="t-old' in row and 'legacy"' in row
+    assert "old control legacy" in (tmp_path / "mitigations.html").read_text()
+    # The diagram draws the tagged component dashed.
+    dfd = (tmp_path / "scenario_Old_way.html").read_text()
+    node = dfd[dfd.index("label = &#34;Old box&#34;") :]
+    assert "tagged" in node[: node.index("]")]
+    # Highlighted on the page of a threat that applies to it, it stays dashed.
+    page = (tmp_path / "threat_T-OLD.html").read_text()
+    assert "filled,dashed" in page and "tagged highlighted" in page
