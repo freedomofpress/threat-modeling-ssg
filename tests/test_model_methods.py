@@ -327,7 +327,8 @@ def test_entity_lists_are_keyed() -> None:
 
 
 def test_threats_by_risk_order() -> None:
-    """Residual risk first, then base risk, then natural id. Unknown risk last."""
+    """Residual risk first, then base risk, then id with numbers compared by value (T2
+    before T10). Unknown risk last."""
     model = ThreatModel(
         threats={
             "T10": Threat(SID="T10", impact="High", likelihood="High"),
