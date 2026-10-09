@@ -98,6 +98,22 @@ def property_href(token: str) -> str:
     return f"property_{slugify(base)}.html"
 
 
+_REQUIREMENT_OPERATORS = {"|": "or", "!=": "≠", "==": "="}
+
+
+def requirement_parts(token: str) -> list[tuple[str, str | None]]:
+    """Split a requirement into (text, href) pairs: each property with a link to its
+    page, and the operators between them as plain text."""
+    parts = []
+    for piece in re.split(r"(\||!=|==)", str(token)):
+        piece = piece.strip()
+        if piece in _REQUIREMENT_OPERATORS:
+            parts.append((_REQUIREMENT_OPERATORS[piece], None))
+        elif piece:
+            parts.append((display_token(piece), property_href(piece)))
+    return parts
+
+
 def status_slug(value: str) -> str:
     return str(value).replace(" ", "-")
 

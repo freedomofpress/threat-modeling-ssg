@@ -1,27 +1,7 @@
 {% extends "base.html" %}
 {% import "includes/macros.html" as m %}
 
-{% block title %}{{ comp_name }} - Threat Model{% endblock %}
-
-{% block content %}
-<h1>Component: {{ comp_name }}{{ m.tag_badges(component.tags) }}</h1>
-{% if component.source %}<p class="threat-id">{{ m.defined_in(config, component.source) }}</p>{% endif %}
-
-<p>{{ component.description }}</p>
-
-<div class="tag-list">
-    {% if component.inBoundary %}<span class="tag tag--text">boundary: {{ component.inBoundary }}</span>{% endif %}
-    {% for key, value in component.properties | implemented %}
-    {% if value is sameas true %}
-    <span class="tag tag--true">{{ key | replace('_', ' ') }}</span>
-    {% else %}
-    <span class="tag tag--text">{{ key | replace('_', ' ') }}: {{ value }}</span>
-    {% endif %}
-    {% endfor %}
-</div>
-
-<h2>Threats Affecting This Component</h2>
-{% if threats %}
+{% macro threat_table(threats) %}
 <table>
     <thead>
         <tr>
@@ -44,8 +24,40 @@
         {% endfor %}
     </tbody>
 </table>
+{% endmacro %}
+
+{% block title %}{{ comp_name }} - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Component: {{ comp_name }}{{ m.tag_badges(component.tags) }}</h1>
+{% if component.source %}<p class="threat-id">{{ m.defined_in(config, component.source) }}</p>{% endif %}
+
+<p>{{ component.description }}</p>
+
+<div class="tag-list">
+    {% if component.inBoundary %}<span class="tag tag--text">boundary: {{ component.inBoundary }}</span>{% endif %}
+    {% for key, value in component.properties | implemented %}
+    {% if value is sameas true %}
+    <span class="tag tag--true">{{ key | replace('_', ' ') }}</span>
+    {% else %}
+    <span class="tag tag--text">{{ key | replace('_', ' ') }}: {{ value }}</span>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{% if boundary_threats %}
+<h2>Threats Listed for This Boundary</h2>
+<p>Each of these applies to every component inside this boundary.</p>
+{{ threat_table(boundary_threats) }}
+{% endif %}
+
+{% if threats or not boundary_threats %}
+<h2>Threats Affecting This Component</h2>
+{% if threats %}
+{{ threat_table(threats) }}
 {% else %}
 <p>No threats identified for this component.</p>
+{% endif %}
 {% endif %}
 
 <h2>Scenarios Using This Component</h2>

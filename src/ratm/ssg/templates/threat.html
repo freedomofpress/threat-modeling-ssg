@@ -144,8 +144,13 @@
     {% if threat.mapping.requirements %}
     <p>{% if threat.mapping.components %}Also applies{% else %}Applies{% endif %} to every component whose properties meet all of these requirements. See the <a href="threat_rules.html">matching rules</a> for every threat.</p>
     <div class="tag-list">
-        {% for prop in threat.mapping.requirements %}
-        <a href="{{ prop | property_href }}" class="tag tag--true">{{ prop | display }}</a>
+        {% for req in threat.mapping.requirements %}
+        {% set parts = req | requirement_parts %}
+        {% if parts | length == 1 %}
+        <a href="{{ parts[0][1] }}" class="tag tag--true">{{ parts[0][0] }}</a>
+        {% else %}
+        <span class="tag tag--true">{% for text, href in parts %}{% if href %}<a href="{{ href }}">{{ text }}</a>{% else %} {{ text }} {% endif %}{% endfor %}</span>
+        {% endif %}
         {% endfor %}
     </div>
     {% endif %}
