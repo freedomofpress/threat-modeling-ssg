@@ -100,6 +100,9 @@ def threat_rules_view(
         "model": model,
         "analysis": model.analyze(),
         "impact_tables": impact_tables,
+        "listed_only": sum(
+            1 for t in model.threats.values() if not t.mapping.requirements
+        ),
     }
 
 

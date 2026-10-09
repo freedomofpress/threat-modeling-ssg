@@ -338,6 +338,10 @@ def test_guide_explains_statuses_and_scores(tmp_path: Path) -> None:
         assert status in guide, status
     # The risk grid: High impact x High likelihood is the maximum, 12.
     assert 'data-impact="High" data-likelihood="High">12' in guide
+    # Every smoke threat has requirements, so the rules page has no note pointing to the
+    # matrix.
+    rules = (tmp_path / "threat_rules.html").read_text()
+    assert 'href="threats_components.html"' not in rules
 
 
 def test_components_and_scenarios_show_open_risk(tmp_path: Path) -> None:
@@ -400,8 +404,12 @@ def test_listed_components_show_on_threat_page_and_matrix(tmp_path: Path) -> Non
     matrix = (tmp_path / "threats_components.html").read_text()
     assert 'href="threat_T-LISTED.html"' in matrix
     assert matrix.count('<td class="prop-cell status--') == 1
-    # The matching-rules grid renders a group with no property columns.
-    assert "T-LISTED" in (tmp_path / "threat_rules.html").read_text()
+    # The matching-rules grid renders a group with no property columns, and a note
+    # counts the listed-only threats and points to the matrix.
+    rules = (tmp_path / "threat_rules.html").read_text()
+    assert "T-LISTED" in rules
+    assert "(1 of 1)" in rules
+    assert 'href="threats_components.html"' in rules
 
 
 def test_tags_show_as_badges_and_dashed_nodes(tmp_path: Path) -> None:
