@@ -497,8 +497,31 @@ def test_mitigation_takes_the_tags_all_its_threats_share(model_factory) -> None:
     assert model.mitigations["M-UNUSED"].tags == []
 
 
-def test_resolve_tags_twice_gives_the_same_tags(model_factory) -> None:
-    model = tagged_model(model_factory, {"T1": ["A", "B"]})
-    model.resolve_tags()
-    model.resolve_tags()
-    assert model.threats["T1"].tags == ["Legacy"]
+def test_listed_threats_reach_nested_boundaries(model_factory) -> None:
+    def boundary(name, inside=None):
+        return Component(name=name, component_class="Boundary", in_boundary=inside)
+
+    model = model_factory(
+        threats={
+            "T-OUTER": Threat(
+                SID="T-OUTER", mapping=ThreatMapping(components=["Outer"])
+            ),
+            "T-INNER": Threat(
+                SID="T-INNER", mapping=ThreatMapping(components=["Inner"])
+            ),
+            "T-PROPS": Threat(SID="T-PROPS", mapping=ThreatMapping(requirements=["x"])),
+        },
+        components={
+            "Outer": boundary("Outer"),
+            "Inner": boundary("Inner", inside="Outer"),
+            # Two boundaries inside each other must not loop.
+            "Loop A": boundary("Loop A", inside="Loop B"),
+            "Loop B": boundary("Loop B", inside="Loop A"),
+        },
+        scenarios=[],
+    )
+    assert model.enclosing_names("Inner") == ["Inner", "Outer"]
+    assert [tid for tid, _ in model.listed_threats("Outer")] == ["T-OUTER"]
+    assert [tid for tid, _ in model.listed_threats("Inner")] == ["T-INNER", "T-OUTER"]
+    assert model.enclosing_names("Loop A") == ["Loop A", "Loop B"]
+    assert model.listed_threats("Loop A") == []

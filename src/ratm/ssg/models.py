@@ -304,6 +304,24 @@ class ThreatModel(BaseModel):
             shared = _shared_tags(threat.tags for threat in listing)
             mitigation.tags = _merge_tags(mitigation.tags, shared)
 
+    def enclosing_names(self, name: str) -> list[str]:
+        """The component's name, then each boundary around it, innermost first."""
+        names, current = [], name
+        while current and current not in names:
+            names.append(current)
+            component = self.components.get(current)
+            current = component.inBoundary if component else None
+        return names
+
+    def listed_threats(self, name: str) -> list[tuple[str, Threat]]:
+        """Threats that list this component or a boundary around it, in risk order."""
+        around = set(self.enclosing_names(name))
+        return self.threats_by_risk(
+            tid
+            for tid, threat in self.threats.items()
+            if around & set(threat.mapping.components)
+        )
+
     def component_tags(self, name: str) -> list[str]:
         component = self.components.get(name)
         return component.tags if component else []

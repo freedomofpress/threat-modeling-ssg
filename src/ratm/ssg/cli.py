@@ -14,6 +14,7 @@ from .utils import (
     mitigation_href,
     property_href,
     render_views,
+    requirement_parts,
     slugify,
     status_slug,
     threat_actor_href,
@@ -50,6 +51,7 @@ def build_env() -> Environment:
     env.filters["slugify"] = slugify
     env.filters["display"] = display_token
     env.filters["property_href"] = property_href
+    env.filters["requirement_parts"] = requirement_parts
     env.filters["mitigation_href"] = mitigation_href
     env.filters["threat_actor_href"] = threat_actor_href
     env.filters["status_slug"] = status_slug

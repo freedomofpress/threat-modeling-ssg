@@ -192,6 +192,11 @@ def component_view(
             "comp_name": name,
             "component": component,
             "threats": threats,
+            # Findings never target a boundary, so its page lists the threats that name
+            # it, or a boundary around it, instead.
+            "boundary_threats": model.listed_threats(name)
+            if component.component_class == "Boundary"
+            else [],
             "scenarios": scenario_names,
             "component_name": slugify(name),
         }

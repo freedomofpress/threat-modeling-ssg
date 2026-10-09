@@ -404,6 +404,11 @@ def test_listed_components_show_on_threat_page_and_matrix(tmp_path: Path) -> Non
     matrix = (tmp_path / "threats_components.html").read_text()
     assert 'href="threat_T-LISTED.html"' in matrix
     assert matrix.count('<td class="prop-cell status--') == 1
+    # Findings never target the boundary itself, so its page lists the threats that name
+    # it.
+    zone_page = (tmp_path / "component_Zone.html").read_text()
+    assert 'href="threat_T-LISTED.html"' in zone_page
+    assert "No threats identified" not in zone_page
     # The matching-rules grid renders a group with no property columns, and a note
     # counts the listed-only threats and points to the matrix.
     rules = (tmp_path / "threat_rules.html").read_text()
@@ -450,3 +455,21 @@ def test_tags_show_as_badges_and_dashed_nodes(tmp_path: Path) -> None:
     # Highlighted on the page of a threat that applies to it, it stays dashed.
     page = (tmp_path / "threat_T-OLD.html").read_text()
     assert "filled,dashed" in page and "tagged highlighted" in page
+
+
+def test_requirement_links_point_to_existing_property_pages(tmp_path: Path) -> None:
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties("reads_input", "is_exposed", "uses_strong_credentials")
+    tm.Threat("T-ANY", requirements=["!reads_input | is_exposed"])
+    tm.Threat("T-CMP", requirements=["reads_input != uses_strong_credentials"])
+    a = tm.Component(name="A", reads_input=True)
+    b = tm.Component(name="B", is_exposed=True)
+    scenario = Scenario(name="S", description="d")
+    scenario.Dataflow(name="f", source=a, sink=b)
+    render(tm.Report([scenario]).generate(), tmp_path)
+    for tid in ("T-ANY", "T-CMP"):
+        page = (tmp_path / f"threat_{tid}.html").read_text()
+        hrefs = set(re.findall(r'href="(property_[^"]+)"', page))
+        assert len(hrefs) == 2, (tid, hrefs)
+        for href in hrefs:
+            assert (tmp_path / href).exists(), (tid, href)

@@ -701,6 +701,13 @@ tbody tr:hover {
     color: var(--color-text-dim);
 }
 
+/* A requirement naming several properties links each one inside its tag. */
+.tag a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .click-zoom {
     input[type=checkbox] { display: none; }
 
