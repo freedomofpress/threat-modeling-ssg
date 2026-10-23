@@ -46,13 +46,37 @@ class ThreatMapping(BaseModel):
         return [k for k in self.requirements if base_prop in _token_props(k)]
 
 
+class TestRef(BaseModel):
+    """An automated test that checks a mitigation, in some code repository."""
+
+    # Not a pytest test class, despite the name.
+    __test__ = False
+
+    repo: str
+    path: str
+    name: str
+    line: int | None = None
+    url: str | None = None
+
+
 class Mitigation(BaseModel):
     id: str
     title: str = ""
     description: str = ""
     status: str = scales.DEFAULT_MITIGATION_STATUS
+    verification: str | None = None
+    tests: list[TestRef] = []
     source: SourceRef | None = None
     tags: list[str] = []
+
+    @property
+    def has_test(self) -> bool:
+        return bool(self.tests)
+
+    @property
+    def counts_for_coverage(self) -> bool:
+        """True for the mitigations the test coverage page measures."""
+        return self.status == "implemented" and self.verification == "test"
 
 
 class ThreatActor(BaseModel):
@@ -473,6 +497,45 @@ class ThreatModel(BaseModel):
             )
         )
         return rows
+
+    def test_coverage(self) -> dict[str, Any]:
+        """How many implemented mitigations are verified by tests.
+
+        `counted` lists those mitigations, the ones without tests first. A mitigation is
+        covered when at least one test reference names it. `methods` counts the other
+        implemented mitigations by verification method, so the page can say what the
+        ratio leaves out, and `not_counted` lists mitigations that have tests but are
+        not measured.
+        """
+        implemented = [
+            m for m in self.mitigations.values() if m.status == "implemented"
+        ]
+        counted = sorted(
+            (m for m in implemented if m.counts_for_coverage),
+            key=lambda m: (bool(m.tests), scales.natural_key(m.id)),
+        )
+        covered = sum(bool(m.tests) for m in counted)
+        by_method = Counter(m.verification for m in implemented)
+        return {
+            "counted": counted,
+            "covered": covered,
+            "ratio": covered / len(counted) if counted else None,
+            "implemented": len(implemented),
+            "methods": {
+                method: by_method[method]
+                for method in scales.VERIFICATION_METHODS
+                if method != "test" and by_method[method]
+            },
+            "unclassified": by_method[None],
+            "not_counted": sorted(
+                (
+                    m
+                    for m in self.mitigations.values()
+                    if m.tests and not m.counts_for_coverage
+                ),
+                key=lambda m: scales.natural_key(m.id),
+            ),
+        }
 
     def parent_threats(self, threat_id: str) -> list[str]:
         """Return the ids of the threats that list threat_id as a child."""

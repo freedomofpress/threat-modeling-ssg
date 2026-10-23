@@ -33,9 +33,25 @@ def author_model() -> dict:
     tm.Mitigation(
         "M-SANITIZE",
         title="Sanitize input",
+        verification="test",
+        tests=[
+            {
+                "repo": "org/app",
+                "path": "tests/test_input.py",
+                "name": "test_rejects_markup",
+                "line": 7,
+                "url": "https://example.com/org/app/blob/abc/tests/test_input.py#L7",
+            },
+            {"repo": "org/infra", "path": "tests/test_waf.py", "name": "test_waf"},
+        ],
     )
-    tm.Mitigation("M-VERIFY", title="Verify deps")
-    tm.Mitigation("M-DOCS", title="Document the risk", status="optional")
+    tm.Mitigation("M-VERIFY", title="Verify deps", verification="test")
+    tm.Mitigation(
+        "M-DOCS",
+        title="Document the risk",
+        status="optional",
+        tests=[{"repo": "org/docs", "path": "tests/test_docs.py", "name": "test_d"}],
+    )
     tm.Mitigation("M-WAF", title="Add a WAF", status="proposed")
     tm.ThreatActor("Nation state", description="Well resourced")
     tm.ThreatActor("Any")
@@ -100,6 +116,7 @@ def test_render_all_views(tmp_path: Path) -> None:
         "components.html",
         "scenarios.html",
         "mitigations.html",
+        "coverage.html",
         "threat_actors.html",
         "threat_T-INPUT.html",
         "threat_T-DEPS.html",
@@ -165,6 +182,7 @@ def test_register_lists_threats_in_risk_order(tmp_path: Path) -> None:
 def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
     render(author_model(), tmp_path)
     mit = (tmp_path / "mitigation_M-SANITIZE.html").read_text()
+    assert "tests/test_input.py" in mit
     assert "threat_T-INPUT.html" in mit
     listing = (tmp_path / "mitigations.html").read_text()
     assert "mitigation_M-WAF.html" in listing and "proposed" in listing
@@ -178,6 +196,63 @@ def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
     assert 'href="threat_T-INPUT.html"' in backlog
     actor = (tmp_path / "threat_actor_Any.html").read_text()
     assert "threat_T-INPUT.html" in actor and "threat_T-DEPS.html" in actor
+
+
+def test_mitigation_page_lists_tests(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    mit = (tmp_path / "mitigation_M-SANITIZE.html").read_text()
+    assert "Verified by test: Checked by automated tests." in mit
+    assert (
+        '<a href="https://example.com/org/app/blob/abc/tests/test_input.py#L7">'
+        "<code>test_rejects_markup</code></a>"
+    ) in mit
+    assert "<code>tests/test_input.py:7</code>" in mit
+    # Without a URL or a line, the reference is plain text.
+    assert "<td><code>test_waf</code></td>" in mit
+    assert "<code>tests/test_waf.py</code>" in mit
+    uncovered = (tmp_path / "mitigation_M-VERIFY.html").read_text()
+    assert "No tests check this mitigation yet." in uncovered
+    # A mitigation with neither a method nor tests has no section.
+    waf = (tmp_path / "mitigation_M-WAF.html").read_text()
+    assert 'id="verification"' not in waf
+
+
+def test_coverage_page(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    page = (tmp_path / "coverage.html").read_text()
+    assert 'href="coverage.html" class="nav-active"' in page
+    assert ">50%<" in page
+    assert "1 of 2 implemented mitigations verified by test has at least one test" in (
+        page
+    )
+    table = page[page.index('id="coverage-list"') : page.index("</table>")]
+    # The uncovered mitigation comes first.
+    assert table.index("mitigation_M-VERIFY.html") < table.index(
+        "mitigation_M-SANITIZE.html"
+    )
+    assert 'data-tests="no"' in table and 'data-tests="yes"' in table
+    assert "org/app, org/infra" in table
+    # M-DOCS has a test but is optional, so it is listed apart.
+    rest = page[page.index("Tests that don't count toward coverage") :]
+    assert "mitigation_M-DOCS.html" in rest
+    assert "mitigation_M-DOCS.html" not in table
+    # Every page links to it.
+    assert 'href="coverage.html"' in (tmp_path / "index.html").read_text()
+
+
+def test_coverage_page_with_nothing_to_measure(tmp_path: Path) -> None:
+    report = author_model()
+    for mitigation in report["mitigations"].values():
+        mitigation["verification"] = None
+    report["mitigations"]["M-VERIFY"]["verification"] = "inspection"
+    render(report, tmp_path)
+    page = (tmp_path / "coverage.html").read_text()
+    assert "No implemented mitigation is marked as verified by test yet" in page
+    assert 'id="coverage-list"' not in page and "%<" not in page
+    assert (
+        "Implemented mitigations not counted: 1 verified by inspection and 1 with"
+        " no verification method yet."
+    ) in page
 
 
 def test_summary_leads_with_open_risk(tmp_path: Path) -> None:
@@ -220,6 +295,10 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
     threat = next(t for t in report["threats"] if t["SID"] == "T-INPUT")
     threat["description"] = tricky
     report["mitigations"]["M-SANITIZE"]["title"] = tricky
+    report["mitigations"]["M-SANITIZE"]["tests"][0]["name"] = tricky
+    report["mitigations"]["M-SANITIZE"]["tests"][0]["url"] = (
+        'https://example.com/"><b>x</b>'
+    )
     model = render(report, tmp_path)
 
     escaped = "Use &#34;safe&#34; &lt;b&gt;parser&lt;/b&gt; &amp; friends"
@@ -237,6 +316,13 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
     link = f'<a href="mitigation_M-SANITIZE.html">{escaped}</a>'
     assert link in (tmp_path / "component_Web_app.html").read_text()
     assert link in (tmp_path / "scenario_Handle_request.html").read_text()
+    mitigation_page = (tmp_path / "mitigation_M-SANITIZE.html").read_text()
+    assert f'title="{escaped}, test_waf"' in mitigation_page
+    assert f"<code>{escaped}</code>" in mitigation_page
+    assert 'href="https://example.com/&#34;&gt;&lt;b&gt;x&lt;/b&gt;"' in (
+        mitigation_page
+    )
+    assert escaped in (tmp_path / "coverage.html").read_text()
 
     for page_path in tmp_path.glob("*.html"):
         page = page_path.read_text()

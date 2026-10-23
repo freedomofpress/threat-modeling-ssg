@@ -5,7 +5,16 @@ import json
 
 import pytest
 
-from ratm import CAPECInfo, Mitigation, Ratm, Report, Scenario, Threat, ThreatActor
+from ratm import (
+    CAPECInfo,
+    Mitigation,
+    Ratm,
+    Report,
+    Scenario,
+    TestRef,
+    Threat,
+    ThreatActor,
+)
 from ratm.ssg.models import ThreatModel, _token_props
 
 
@@ -22,6 +31,7 @@ def tm() -> Ratm:
     tm.Mitigation(
         "M-VERIFY",
         title="Verify resources",
+        tests=[{"repo": "org/app", "path": "tests/test_deps.py", "name": "test_d"}],
         status="proposed",
     )
     tm.Mitigation("M-DOCS", title="Document the risk", status="optional")
@@ -41,16 +51,54 @@ def make_scenario(tm: Ratm) -> Scenario:
 # -- Mitigation and ThreatActor entities
 
 
-def test_mitigation_to_dict() -> None:
+def test_mitigation_to_dict_and_has_test() -> None:
     mit = Mitigation("M1", title="T", source=("model.py", 3))
+    assert mit.has_test is False
     assert mit.to_dict() == {
         "id": "M1",
         "title": "T",
         "description": "",
         "status": "implemented",
+        "verification": None,
+        "tests": [],
         "source": {"file": "model.py", "line": 3},
         "tags": [],
     }
+    assert Mitigation("M2", title="T", tests=[REF]).has_test is True
+
+
+REF = {
+    "repo": "org/app",
+    "path": "tests/test_x.py",
+    "name": "test_x",
+    "line": 4,
+    "url": "https://example.com/org/app/blob/abc/tests/test_x.py#L4",
+}
+
+
+def test_mitigation_test_refs_and_verification() -> None:
+    mit = Mitigation(
+        "M1",
+        title="T",
+        verification="test",
+        tests=[TestRef(**REF), {**REF, "name": "test_y", "line": None, "url": None}],
+    )
+    # Dicts, as loaded from a scan file, become TestRef objects.
+    assert all(isinstance(ref, TestRef) for ref in mit.tests)
+    assert mit.has_test is True
+    data = mit.to_dict()
+    assert data["verification"] == "test"
+    assert data["tests"] == [
+        REF,
+        {**REF, "name": "test_y", "line": None, "url": None},
+    ]
+
+
+def test_test_refs_added_after_registration_reach_the_report(tm: Ratm) -> None:
+    """A model can register mitigations first and attach scan results later."""
+    tm.mitigations["M-SANITIZE"].tests.append(TestRef(**REF))
+    report = tm.Report([make_scenario(tm)]).generate()
+    assert report["mitigations"]["M-SANITIZE"]["tests"] == [REF]
 
 
 def test_threat_actor_to_dict() -> None:
@@ -168,6 +216,9 @@ def test_report_emits_entities_and_all_findings(tm: Ratm) -> None:
         "mitigations",
         "threat_actors",
     }
+    assert report["mitigations"]["M-VERIFY"]["tests"][0]["path"] == (
+        "tests/test_deps.py"
+    )
     assert report["threat_actors"]["Nation state"]["description"] == (
         "Well-resourced adversary"
     )
@@ -211,6 +262,42 @@ def test_report_validates_mitigation_status(tm: Ratm) -> None:
     tm.Mitigation("M-BAD", title="Bad", status="done")
     with pytest.raises(ValueError, match="M-BAD.*status.*done"):
         tm.Report([make_scenario(tm)]).generate()
+
+
+def test_report_validates_verification(tm: Ratm) -> None:
+    scenario = make_scenario(tm)
+    for method in ("test", "inspection", "analysis", "demonstration", None):
+        tm.mitigations["M-DOCS"].verification = method
+        tm.Report([scenario]).generate()
+    tm.Mitigation("M-BAD", title="Bad", verification="tested")
+    with pytest.raises(ValueError, match="M-BAD.*verification.*tested"):
+        tm.Report([scenario]).generate()
+
+
+@pytest.mark.parametrize(
+    ("ref", "message"),
+    [
+        (REF, None),
+        ({**REF, "line": None, "url": None}, None),
+        ({**REF, "url": "http://example.com/t.py"}, None),
+        ({**REF, "repo": ""}, "test repo must be a non-empty string"),
+        ({**REF, "path": None}, "test path must be a non-empty string"),
+        ({**REF, "name": ""}, "test name must be a non-empty string"),
+        ({**REF, "line": "4"}, "test test_x has invalid line '4'"),
+        ({**REF, "line": 0}, "test test_x has invalid line 0"),
+        ({**REF, "line": True}, "test test_x has invalid line True"),
+        ({**REF, "url": "javascript:alert(1)"}, "test test_x has a URL that is not"),
+        ({**REF, "url": "example.com/t.py"}, "test test_x has a URL that is not"),
+        ("tests/test_x.py", "tests must be TestRef objects"),
+    ],
+)
+def test_report_validates_test_refs(tm: Ratm, ref, message) -> None:
+    tm.mitigations["M-DOCS"].tests = [TestRef(**ref) if isinstance(ref, dict) else ref]
+    if message is None:
+        tm.Report([make_scenario(tm)]).generate()
+    else:
+        with pytest.raises(ValueError, match=f"M-DOCS {message}"):
+            tm.Report([make_scenario(tm)]).generate()
 
 
 def test_report_validates_duplicate_threat_ids() -> None:

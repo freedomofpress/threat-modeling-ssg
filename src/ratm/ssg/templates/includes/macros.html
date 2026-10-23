@@ -4,7 +4,7 @@
 
 {% macro mitigation_status(mitigation) -%}
 <span class="status-badge status--{{ mitigation.status }}">{{ mitigation.status }}</span>
-
+{%- if mitigation.has_test %} <span class="status-badge status--test" title="{{ mitigation.tests | map(attribute='name') | join(', ') }}">has automated test</span>{% endif %}
 {%- endmacro %}
 
 {# Tags such as "Legacy", each as a small badge after a name. #}

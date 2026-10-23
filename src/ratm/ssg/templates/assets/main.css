@@ -264,6 +264,8 @@ nav {
     a {
         margin-right: 15px;
         font-weight: 500;
+        /* Keep two-word labels such as "Threat Actors" in one pill. */
+        white-space: nowrap;
         padding: 6px 12px;
         border-radius: 4px;
         background-color: var(--color-bg-header);
@@ -988,6 +990,14 @@ svg a {
 .status-badge.status--out-of-scope,
 .count-box.status--out-of-scope {
     border-style: dashed;
+}
+
+/* The badge naming a mitigation's test. It isn't a status, so it is drawn
+   as a plain outline in the text color and never looks like a warning. */
+.status-badge.status--test {
+    background-color: transparent;
+    color: var(--color-text);
+    border: 1px solid currentColor;
 }
 
 .count-box[class*="status--"] .count-box__value,

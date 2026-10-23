@@ -1,5 +1,13 @@
 from . import scales
-from .components import Component, Mitigation, Property, Scenario, Threat, ThreatActor
+from .components import (
+    Component,
+    Mitigation,
+    Property,
+    Scenario,
+    TestRef,
+    Threat,
+    ThreatActor,
+)
 
 
 class Report:
@@ -70,6 +78,15 @@ class Report:
                 raise ValueError(
                     f"Mitigation {mit.id} has unknown status '{mit.status}'"
                 )
+            if (
+                mit.verification is not None
+                and mit.verification not in scales.VERIFICATION_METHODS
+            ):
+                raise ValueError(
+                    f"Mitigation {mit.id} has unknown verification '{mit.verification}'"
+                )
+            for ref in mit.tests:
+                _check_test_ref(f"Mitigation {mit.id}", ref)
 
         for threat in self.threats:
             prefix = f"Threat {threat.id}"
@@ -140,3 +157,23 @@ def _check_tags(prefix: str, tags) -> None:
         isinstance(tag, str) and tag for tag in tags
     ):
         raise ValueError(f"{prefix} tags must be a list of non-empty strings")
+
+
+def _check_test_ref(prefix: str, ref) -> None:
+    if not isinstance(ref, TestRef):
+        # A ValueError rather than a TypeError, because validate() reports every problem
+        # in the model as a ValueError.
+        raise ValueError(f"{prefix} tests must be TestRef objects")  # noqa: TRY004
+    for field in ("repo", "path", "name"):
+        value = getattr(ref, field)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"{prefix} test {field} must be a non-empty string")
+    if ref.line is not None and (
+        isinstance(ref.line, bool) or not isinstance(ref.line, int) or ref.line < 1
+    ):
+        raise ValueError(f"{prefix} test {ref.name} has invalid line {ref.line!r}")
+    # The site puts the URL in a link, and autoescaping does not stop a javascript: URL.
+    if ref.url is not None and not (
+        isinstance(ref.url, str) and ref.url.startswith(("https://", "http://"))
+    ):
+        raise ValueError(f"{prefix} test {ref.name} has a URL that is not http(s)")
