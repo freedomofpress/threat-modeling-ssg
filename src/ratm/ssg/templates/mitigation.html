@@ -32,8 +32,38 @@
 
 {% if mitigation.description %}<p>{{ mitigation.description }}</p>{% endif %}
 
-<div class="tag-list">
+{% if mitigation.verification or mitigation.tests %}
+<h2 id="verification">Verification</h2>
+{% if mitigation.verification %}
+<p>Verified by {{ mitigation.verification }}: {{ verification_methods.get(mitigation.verification, "") }}</p>
+{% else %}
+<p>No verification method recorded yet.</p>
+{% endif %}
+{% if mitigation.tests %}
+<div class="scroll-x">
+<table>
+    <thead>
+        <tr>
+            <th>Test</th>
+            <th>Repository</th>
+            <th>File</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ref in mitigation.tests %}
+        <tr>
+            <td>{% if ref.url %}<a href="{{ ref.url }}"><code>{{ ref.name }}</code></a>{% else %}<code>{{ ref.name }}</code>{% endif %}</td>
+            <td>{{ ref.repo }}</td>
+            <td><code>{{ ref.path }}{% if ref.line %}:{{ ref.line }}{% endif %}</code></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 </div>
+{% elif mitigation.counts_for_coverage %}
+<p><strong>No tests check this mitigation yet.</strong> It counts against <a href="coverage.html">test coverage</a>.</p>
+{% endif %}
+{% endif %}
 
 <h2>Threats it mitigates</h2>
 {% if threats %}

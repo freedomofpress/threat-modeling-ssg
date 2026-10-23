@@ -29,6 +29,16 @@ MITIGATION_STATUSES = {
 }
 DEFAULT_MITIGATION_STATUS = "implemented"
 
+# How a mitigation is shown to work, as in requirements engineering. A mitigation can
+# leave this unset until someone classifies it. Test coverage counts only implemented
+# mitigations verified by test.
+VERIFICATION_METHODS = {
+    "test": "Checked by automated tests.",
+    "inspection": "Checked by examining code, configuration, or documentation.",
+    "analysis": "Shown to hold by reasoning or calculation.",
+    "demonstration": "Shown by operating the system and watching the result.",
+}
+
 IMPACT_SCORES = {"Low": 1, "Medium": 2, "High": 3}
 LIKELIHOOD_SCORES = {"Very Low": 1, "Low": 2, "Medium": 3, "High": 4}
 

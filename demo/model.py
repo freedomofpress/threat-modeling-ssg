@@ -1,4 +1,4 @@
-from ratm import Ratm
+from ratm import Ratm, TestRef
 from ratm.components import CAPECInfo, Scenario
 
 # [ Demo threat model ]
@@ -40,6 +40,10 @@ tm.define_properties(
 # Each mitigation is its own object with an id, a title, and a status: "implemented",
 # "optional", or "proposed".
 #
+# `verification` says how the mitigation is shown to work: "test", "inspection",
+# "analysis", or "demonstration". `tests` lists the automated tests that check it, as
+# TestRef objects or dicts with the same keys.
+#
 # When a control is a component property, put it in the threat's requirements instead,
 # as RATM-3-SECRETS does with "!encrypts_secrets". The threat then applies only to
 # components without the control.
@@ -48,15 +52,40 @@ tm.Mitigation(
     "MIT-VERIFY-DEPS",
     title="Pin and hash-check dependencies",
     description="Lockfiles with hashes make the registry unable to swap a package.",
+    verification="test",
+    tests=[
+        TestRef(
+            repo="freedomofpress/threat-modeling-ssg",
+            path="tests/test_lockfile.py",
+            name="test_hashes_pinned",
+            line=12,
+            url="https://github.com/freedomofpress/threat-modeling-ssg/blob/main/tests/test_lockfile.py#L12",
+        ),
+        {
+            "repo": "freedomofpress/threat-modeling-ssg",
+            "path": "tests/test_lockfile.py",
+            "name": "test_npm_packages_have_integrity",
+            "line": 30,
+            "url": "https://github.com/freedomofpress/threat-modeling-ssg/blob/main/tests/test_lockfile.py#L30",
+        },
+    ],
 )
 tm.Mitigation(
     "MIT-STRONG-CREDS",
     title="Hardware-backed or short-lived credentials",
+    verification="inspection",
+)
+tm.Mitigation(
+    "MIT-ESCAPE-REPORT",
+    title="Escape model text in the report",
+    description="Titles and descriptions cannot add markup or scripts to the site.",
+    verification="test",
 )
 tm.Mitigation(
     "MIT-ENCRYPT-SECRETS",
     title="Encrypt tokens at rest",
     status="proposed",
+    verification="test",
 )
 tm.Mitigation(
     "MIT-VERIFY-SOURCE",
@@ -68,6 +97,13 @@ tm.Mitigation(
     title="Content Security Policy on the report",
     description="Restricts what the vendored scripts may load or connect to.",
     status="optional",
+    tests=[
+        TestRef(
+            repo="freedomofpress/threat-modeling-ssg",
+            path="tests/test_smoke.py",
+            name="test_pages_set_csp",
+        )
+    ],
 )
 
 # -- Threat actors
@@ -168,7 +204,7 @@ tm.Threat(
 tm.Threat(
     "RATM-4-EXEC",
     requirements=["executes_code"],
-    mitigations=["MIT-CSP"],
+    mitigations=["MIT-CSP", "MIT-ESCAPE-REPORT"],
     further_mitigations=["MIT-VERIFY-SOURCE"],
     status="unmanaged",
     impact="High",

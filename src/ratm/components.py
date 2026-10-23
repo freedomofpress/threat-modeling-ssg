@@ -318,6 +318,23 @@ class CAPECInfo:
 
 
 @dataclass
+class TestRef:
+    """An automated test that checks a mitigation, in some code repository."""
+
+    # Not a pytest test class, despite the name.
+    __test__ = False
+
+    repo: str
+    path: str
+    name: str
+    line: int = None
+    url: str = None
+
+    def to_dict(self):
+        return dataclasses.asdict(self)
+
+
+@dataclass
 class Mitigation:
     """A control that reduces one or more threats."""
 
@@ -325,6 +342,9 @@ class Mitigation:
     title: str
     description: str = None
     status: str = scales.DEFAULT_MITIGATION_STATUS
+    # One of scales.VERIFICATION_METHODS, or None until someone classifies it.
+    verification: str = None
+    tests: list[TestRef] = dataclasses.field(default_factory=list)
 
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
     tags: list[str] = dataclasses.field(default_factory=list)
@@ -332,6 +352,13 @@ class Mitigation:
     def __post_init__(self):
         if self.source is None:
             self.source = _caller_source()
+        self.tests = [
+            TestRef(**ref) if isinstance(ref, dict) else ref for ref in self.tests
+        ]
+
+    @property
+    def has_test(self):
+        return bool(self.tests)
 
     def to_dict(self):
         return {
@@ -339,6 +366,8 @@ class Mitigation:
             "title": self.title,
             "description": self.description or "",
             "status": self.status,
+            "verification": self.verification,
+            "tests": [ref.to_dict() for ref in self.tests],
             "source": _source_dict(self.source),
             "tags": list(self.tags),
         }

@@ -7,6 +7,7 @@ from ratm.ssg.models import (
     Mitigation,
     Property,
     Scenario,
+    TestRef,
     Threat,
     ThreatActor,
     ThreatMapping,
@@ -323,6 +324,60 @@ def test_entity_lists_are_keyed() -> None:
     assert list(model.threats) == ["T1"]
     assert list(model.mitigations) == ["M1"]
     assert list(model.threat_actors) == ["Any"]
+
+
+def test_mitigation_has_test() -> None:
+    assert DOCS.has_test is False
+    ref = TestRef(repo="org/app", path="tests/x.py", name="test_x")
+    assert Mitigation(id="M", title="t", tests=[ref]).has_test is True
+
+
+def test_test_coverage(model_factory) -> None:
+    ref = TestRef(repo="org/app", path="tests/test_a.py", name="test_a")
+
+    def mit(mid, **kwargs):
+        return Mitigation(id=mid, title=mid, **kwargs)
+
+    mitigations = [
+        mit("M10", verification="test", tests=[ref]),
+        mit("M2", verification="test"),
+        mit("M1", verification="test", tests=[ref, ref]),
+        mit("M3", verification="test"),
+        mit("M-INSPECT", verification="inspection", tests=[ref]),
+        mit("M-ANALYSIS", verification="analysis"),
+        mit("M-NONE"),
+        mit("M-NONE-2"),
+        mit("M-PLANNED", status="proposed", verification="test", tests=[ref]),
+        mit("M-OPT", status="optional", verification="test"),
+    ]
+    model = model_factory(
+        threats={},
+        components={},
+        scenarios=[],
+        mitigations={m.id: m for m in mitigations},
+    )
+    coverage = model.test_coverage()
+    # Uncovered first, then ids in number order.
+    assert [m.id for m in coverage["counted"]] == ["M2", "M3", "M1", "M10"]
+    assert coverage["covered"] == 2
+    assert coverage["ratio"] == 0.5
+    assert coverage["implemented"] == 8
+    assert coverage["methods"] == {"inspection": 1, "analysis": 1}
+    assert coverage["unclassified"] == 2
+    # Tests that point at mitigations the ratio leaves out.
+    assert [m.id for m in coverage["not_counted"]] == ["M-INSPECT", "M-PLANNED"]
+
+
+def test_test_coverage_with_nothing_to_measure(model_factory) -> None:
+    model = model_factory(
+        threats={},
+        components={},
+        scenarios=[],
+        mitigations={"M1": Mitigation(id="M1", title="One")},
+    )
+    coverage = model.test_coverage()
+    assert coverage["counted"] == [] and coverage["ratio"] is None
+    assert coverage["unclassified"] == 1
 
 
 def test_threats_by_risk_order() -> None:
