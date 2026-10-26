@@ -236,7 +236,7 @@ def scenario_view(
             "config": config,
             "model": model,
             "scenario": scenario,
-            "scenario_name": scenario.name.replace(" ", "_"),
+            "scenario_name": slugify(scenario.name),
         }
 
 
