@@ -17,7 +17,16 @@ class SiteConfig(BaseModel):
     title: str = "Threat Model Report"
     logo: str | None = None
     github_repo: str | None = None
+    # Branch used by "Defined in" links to files in github_repo.
+    github_branch: str = "main"
     hide_components_with_category: list[str] = []
+
+
+class SourceRef(BaseModel):
+    """Where an item is defined in the model's repository."""
+
+    file: str
+    line: int | None = None
 
 
 class ThreatMapping(BaseModel):
@@ -40,11 +49,13 @@ class Mitigation(BaseModel):
     title: str = ""
     description: str = ""
     status: str = scales.DEFAULT_MITIGATION_STATUS
+    source: SourceRef | None = None
 
 
 class ThreatActor(BaseModel):
     name: str
     description: str = ""
+    source: SourceRef | None = None
 
 
 class Threat(BaseModel):
@@ -62,6 +73,7 @@ class Threat(BaseModel):
     threat_actors: list[str] = []
     children: list[str] = []
     mapping: ThreatMapping = Field(default_factory=ThreatMapping)
+    source: SourceRef | None = None
 
     @property
     def impact_label(self) -> str:
@@ -144,6 +156,7 @@ class Component(BaseModel):
     description: str | None = ""
     inBoundary: str | None = Field(alias="in_boundary", default=None)
     properties: dict[str, Any] = {}
+    source: SourceRef | None = None
     _key: str | None = PrivateAttr(default=None)
 
     def get_property(self, name):
@@ -168,12 +181,17 @@ class Scenario(BaseModel):
     description: str = ""
     name: str
     file: str = ""
+    line: int | None = None
     findings: list[Finding] = []
     flows: list[Flow] = []
     components: list[str] = []
     dfd: str = ""
     mermaid: str = ""
     url: str | None = None
+
+    @property
+    def source(self) -> SourceRef | None:
+        return SourceRef(file=self.file, line=self.line) if self.file else None
 
     @property
     def linked_component_names(self) -> set:
@@ -219,6 +237,14 @@ def _token_satisfied(component: Component, token: str) -> bool:
     return bool(component.properties.get(token))
 
 
+def source_url(config: SiteConfig, source: SourceRef | None) -> str | None:
+    """Link to a definition in the repository, if the site knows the repository."""
+    if not (config.github_repo and source):
+        return None
+    anchor = f"#L{source.line}" if source.line else ""
+    return f"{config.github_repo}/blob/{config.github_branch}/{source.file}{anchor}"
+
+
 class ThreatModel(BaseModel):
     threats: dict[str, Threat]
     components: dict[str, Component]
@@ -261,7 +287,7 @@ class ThreatModel(BaseModel):
 
         for scenario in self.scenarios:
             if config.github_repo and scenario.file:
-                scenario.url = f"{config.github_repo}/blob/main/{scenario.file}"
+                scenario.url = source_url(config, scenario.source)
             scenario.dfd = generate_dataflow(scenario, self.components)
             scenario.mermaid = generate_sequence(scenario)
 
@@ -301,7 +327,9 @@ class ThreatModel(BaseModel):
             for label in scales.IMPACT_ORDER
             if impact_counter[label]
         }
-        status_counter = Counter(t.status for t in active)
+        # Count every defined threat, so each count matches the register filtered to
+        # that status.
+        status_counter = Counter(t.status for t in self.threats.values())
         status_distribution = {
             status: status_counter[status]
             for status in scales.THREAT_STATUSES
@@ -364,6 +392,57 @@ class ThreatModel(BaseModel):
             if mitigation_id in t.mapping.further_mitigations
         ]
         return mitigating, proposing
+
+    def open_risk(self, threat_ids: Iterable[str]) -> dict[str, Any]:
+        """Summarize a group of threats: how many, how many are open, and the highest
+        risk after mitigations among the open ones."""
+        threats = [self.threats[tid] for tid in set(threat_ids) if tid in self.threats]
+        open_scores = [
+            t.residual_risk_score
+            for t in threats
+            if t.is_open and t.residual_risk_score
+        ]
+        return {
+            "total": len(threats),
+            "open": sum(t.is_open for t in threats),
+            "top_risk": max(open_scores) if open_scores else None,
+        }
+
+    def backlog(self) -> list[dict[str, Any]]:
+        """Proposed mitigations, ranked by the highest risk they would reduce.
+
+        Each entry lists the threats naming the mitigation (in place or as a further
+        mitigation) in risk order, the highest risk after mitigations among them, and
+        how many are open. Ties fall back to the open count, then the mitigation id.
+        """
+        rows = []
+        for mid, mit in self.mitigations.items():
+            if mit.status != "proposed":
+                continue
+            mitigating, proposing = self.mitigation_threats(mid)
+            threats = sorted(
+                {tid: t for tid, t in mitigating + proposing}.items(),
+                key=lambda item: item[1].risk_order,
+            )
+            scores = [
+                t.residual_risk_score for _, t in threats if t.residual_risk_score
+            ]
+            rows.append(
+                {
+                    "mitigation": mit,
+                    "threats": threats,
+                    "top_risk": max(scores) if scores else None,
+                    "open_count": sum(t.is_open for _, t in threats),
+                }
+            )
+        rows.sort(
+            key=lambda row: (
+                -(row["top_risk"] or 0),
+                -row["open_count"],
+                scales.natural_key(row["mitigation"].id),
+            )
+        )
+        return rows
 
     def parent_threats(self, threat_id: str) -> list[str]:
         """Return the ids of the threats that list threat_id as a child."""

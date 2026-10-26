@@ -6,34 +6,54 @@
 {% block content %}
 <h1>Mitigations</h1>
 
-<p>{{ rows | length }} mitigations defined.</p>
+<p>Every mitigation in the model. Proposed mitigations are ranked by the risk they would reduce on the <a href="backlog.html">backlog</a>.</p>
 
 {% if rows %}
-<table>
+<form class="table-filters" data-filter-for="mitigation-list">
+    <label>Status
+        <select name="status" id="mitigations-status">
+            <option value="">Any</option>
+            {% for status in statuses %}<option value="{{ status }}">{{ status | capitalize }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Search
+        <input type="search" name="q" id="mitigations-search" placeholder="Title or id">
+    </label>
+    <output class="table-count" data-count-for="mitigation-list">{{ rows | length }} mitigations</output>
+</form>
+
+<div class="scroll-x">
+<table id="mitigation-list" data-sortable>
     <thead>
         <tr>
-            <th>ID</th>
-            <th>Mitigation</th>
+            <th aria-sort="ascending"><button type="button" data-sort-key="id" data-sort-first="asc">Mitigation</button></th>
             <th>Status</th>
-            <th>Threats it mitigates</th>
-            <th>Possible further mitigation for</th>
+            <th aria-sort="none"><button type="button" data-sort-key="mitigates">Mitigates</button></th>
+            <th aria-sort="none"><button type="button" data-sort-key="proposed">Proposed for</button></th>
         </tr>
     </thead>
     <tbody>
-        {% for mitigation, mitigating, proposing in rows %}
-        <tr>
-            <td>{{ m.mitigation_link(mitigation) }}</td>
-            <td>{{ mitigation.title }}</td>
-            <td>{{ m.mitigation_status(mitigation) }}</td>
-            <td>{% for tid, _ in mitigating %}<a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
-            <td>{% for tid, _ in proposing %}<a href="threat_{{ tid }}.html">{{ tid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+        {% for row in rows %}
+        {% set mit = row.mitigation %}
+        <tr data-status="{{ mit.status }}"
+            data-q="{{ [mit.id, mit.title] | join(' ') | lower }}"
+            data-sort-id="{{ row.rank }}"
+            data-sort-mitigates="{{ row.mitigating | length }}"
+            data-sort-proposed="{{ row.proposing | length }}">
+            <td>{{ m.mitigation_link(mit) }}</td>
+            <td>{{ m.mitigation_status(mit) }}</td>
+            <td>{{ m.count(row.mitigating | length, "threat") }}</td>
+            <td>{{ m.count(row.proposing | length, "threat") }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
 <p><em>No mitigations defined.</em></p>
 {% endif %}
+{% endblock %}
 
-<p><a href="index.html">Back to Summary</a></p>
+{% block scripts %}
+{% include "includes/table_tools.html" %}
 {% endblock %}

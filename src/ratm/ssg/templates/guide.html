@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% import "includes/macros.html" as m %}
+{% set active_page = "guide.html" %}
+{% block title %}How to read this model - Threat Model{% endblock %}
+
+{% block content %}
+<h1>How to read this model</h1>
+
+<p>Each threat describes something that could go wrong, the components it applies to, how likely and how damaging it is, and what is being done about it.</p>
+
+<h2 id="statuses">Threat status</h2>
+<p>The status records how the team is handling a threat. <strong>Open</strong> threats are the ones that still need work. They are counted and ranked separately on the summary.</p>
+<table>
+    <thead><tr><th>Status</th><th>Meaning</th><th>Open</th></tr></thead>
+    <tbody>
+        {% for status, meaning, is_open in threat_statuses %}
+        <tr>
+            <td>{{ m.status_badge(status) }}</td>
+            <td>{{ meaning }}</td>
+            <td>{{ "Yes" if is_open else "" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2 id="risk">Risk</h2>
+<p>Risk is impact times likelihood. Impact runs from Low (1) to High (3) and likelihood from Very Low (1) to High (4), so risk runs from 1 to 12. Scores of {% for name, low, high in bands %}{{ low }}–{{ high }} are {{ name }}{% if loop.revindex == 2 %}, and {% elif not loop.last %}, {% endif %}{% endfor %}.</p>
+<div class="scroll-x">
+<table class="risk-grid">
+    <thead>
+        <tr>
+            <th>Impact \ Likelihood</th>
+            {% for likelihood, score in likelihoods %}<th>{{ likelihood }} ({{ score }})</th>{% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for impact, iscore in impacts %}
+        <tr>
+            <th>{{ impact }} ({{ iscore }})</th>
+            {% for likelihood, lscore in likelihoods %}
+            {% set score = risk_score(impact, likelihood) %}
+            <td class="risk-cell risk-cell--{{ score | risk_band }}" data-impact="{{ impact }}" data-likelihood="{{ likelihood }}">{{ score }} <span class="risk-band">{{ score | risk_band }}</span></td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<h2 id="residual">After mitigations</h2>
+<p>Each threat can also record the impact and likelihood that remain once its mitigations are in place. The risk computed from those is the <strong>risk after mitigations</strong>, also called residual risk. When a threat records nothing different, it equals the original risk. Lists on this site put the highest risk after mitigations first. The residual risk note on a threat page explains what is left.</p>
+
+<h2 id="mitigations">Mitigation status</h2>
+<table>
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+        {% for status, meaning in mitigation_statuses %}
+        <tr><td>{{ m.status_badge(status) }}</td><td>{{ meaning }}</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2 id="matching">Where threats apply</h2>
+<p>Each component has properties, such as whether it is exposed to the network. A threat applies to every component whose properties meet all of its requirements. Scenarios show those components in context. The <a href="internals.html">model internals</a> pages show the rules themselves.</p>
+{% endblock %}

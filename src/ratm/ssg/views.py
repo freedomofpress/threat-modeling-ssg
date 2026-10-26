@@ -13,7 +13,28 @@ def summary_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
-    return {"config": config, "model": model, "analysis": model.analyze()}
+    analysis = model.analyze()
+    # The highest residual risks that still need work and apply to at least one
+    # component in a scenario.
+    top_open = [
+        {
+            "tid": tid,
+            "threat": threat,
+            "components": sorted(
+                analysis["threats_to_components"].get(tid, set()),
+                key=scales.natural_key,
+            ),
+        }
+        for tid, threat in model.threats_by_risk()
+        if threat.is_open and tid in analysis["threat_counter"]
+    ][:10]
+    return {
+        "config": config,
+        "model": model,
+        "analysis": analysis,
+        "top_open": top_open,
+        "open_count": sum(t.is_open for t in model.threats.values()),
+    }
 
 
 @view("/threats.html", log="Generating threats.html...")
@@ -21,11 +42,50 @@ def threats_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
+    """The risk register: every threat in risk order, sortable and filterable."""
+    analysis = model.analyze()
+    rows = []
+    for tid, threat in model.threats_by_risk():
+        components = sorted(
+            analysis["threats_to_components"].get(tid, set()), key=scales.natural_key
+        )
+        rows.append({"tid": tid, "threat": threat, "components": components})
+    id_rank = {
+        tid: rank
+        for rank, tid in enumerate(sorted(model.threats, key=scales.natural_key))
+    }
+    return {
+        "config": config,
+        "model": model,
+        "rows": rows,
+        "id_rank": id_rank,
+        "status_rank": {s: i for i, s in enumerate(scales.THREAT_STATUSES)},
+        "impact_scores": scales.IMPACT_SCORES,
+        "likelihood_scores": scales.LIKELIHOOD_SCORES,
+        "statuses": [
+            s
+            for s in scales.THREAT_STATUSES
+            if any(t.status == s for t in model.threats.values())
+        ],
+        "actors": sorted(
+            {a for t in model.threats.values() for a in t.threat_actors},
+            key=scales.natural_key,
+        ),
+    }
+
+
+@view("/threat_rules.html", log="Generating threat_rules.html...")
+def threat_rules_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Model internals: which component properties each threat's rule uses."""
     all_props = list(model.properties)
     impact_tables = []
     for impact in scales.IMPACT_ORDER:
         threats = sorted(
-            (tid, t) for tid, t in model.threats.items() if t.impact_label == impact
+            ((tid, t) for tid, t in model.threats.items() if t.impact_label == impact),
+            key=lambda item: scales.natural_key(item[0]),
         )
         if not threats:
             continue
@@ -91,7 +151,7 @@ def threat_view(
             "threat": threat,
             "components": affected_components,
             "scenarios": scenario_names,
-            "frequency": analysis["threat_counter"].get(threat_id, 0),
+            "status_descriptions": scales.THREAT_STATUSES,
             "threat_scenario_data": threat_scenario_data,
             "mitigations": model.threat_mitigations(threat),
             "further_mitigations": model.threat_mitigations(threat, further=True),
@@ -113,7 +173,9 @@ def component_view(
 ) -> Iterable[dict[str, Any]]:
     analysis = model.analyze()
     for name, component in model.components.items():
-        threat_ids = sorted(analysis["components_to_threats"].get(name, set()))
+        threats = model.threats_by_risk(
+            analysis["components_to_threats"].get(name, set())
+        )
         scenario_names = list(
             dict.fromkeys(
                 s.name
@@ -126,11 +188,14 @@ def component_view(
             "model": model,
             "comp_name": name,
             "component": component,
-            "threats": threat_ids,
+            "threats": threats,
             "scenarios": scenario_names,
             "component_name": slugify(name),
         }
 
+
+# Components carry the threats, so they come first. Boundaries rarely do.
+_CLASS_ORDER = {"Component": 0, "Actor": 1, "Boundary": 2}
 
 _PLURAL_CLASSES = {
     "Actor": "Actors",
@@ -144,6 +209,43 @@ def components_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
+    """Components grouped by class, the ones carrying the most open risk first."""
+    analysis = model.analyze()
+    groups: dict[str, list] = {}
+    for name, component in model.components.items():
+        if component.component_class in config.hide_components_with_category:
+            continue
+        summary = model.open_risk(analysis["components_to_threats"].get(name, set()))
+        groups.setdefault(component.component_class, []).append(
+            {"name": name, "component": component, **summary}
+        )
+    class_lists = [
+        {
+            "label": _PLURAL_CLASSES.get(cls, cls),
+            "members": sorted(
+                members,
+                key=lambda row: (
+                    -(row["top_risk"] or 0),
+                    -row["open"],
+                    -row["total"],
+                    scales.natural_key(row["name"]),
+                ),
+            ),
+        }
+        for cls, members in sorted(
+            groups.items(),
+            key=lambda item: (_CLASS_ORDER.get(item[0], len(_CLASS_ORDER)), item[0]),
+        )
+    ]
+    return {"config": config, "model": model, "class_lists": class_lists}
+
+
+@view("/component_properties.html", log="Generating component_properties.html...")
+def component_properties_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Model internals: which properties each component has."""
     prop_keys = list(model.properties)
     members_by_class: dict[str, list] = {}
     for name, component in sorted(
@@ -182,14 +284,11 @@ def property_view(
 ) -> Iterable[dict[str, Any]]:
     analysis = model.analyze()
     for prop_key, prop in model.properties.items():
-        requiring_threats = sorted(
-            (
-                (tid, t)
-                for tid, t in model.threats.items()
-                if tid in analysis["threat_counter"]
-                and prop_key in t.mapping.requirement_props
-            ),
-            key=lambda x: x[0],
+        requiring_threats = model.threats_by_risk(
+            tid
+            for tid, t in model.threats.items()
+            if tid in analysis["threat_counter"]
+            and prop_key in t.mapping.requirement_props
         )
         slug = slugify(prop_key)
         yield {
@@ -215,10 +314,28 @@ def scenario_view(
     model: ThreatModel,
 ) -> Iterable[dict[str, Any]]:
     for scenario in model.scenarios:
+        # One row per (threat, component) finding, highest risk first.
+        findings = sorted(
+            (
+                {
+                    "tid": f.threat_id,
+                    "threat": model.threats[f.threat_id],
+                    "target": f.target,
+                }
+                for f in scenario.findings
+                if f.threat_id in model.threats
+            ),
+            key=lambda row: (
+                row["threat"].risk_order,
+                scales.natural_key(row["target"]),
+            ),
+        )
         yield {
             "config": config,
             "model": model,
             "scenario": scenario,
+            "summary": model.open_risk(f.threat_id for f in scenario.findings),
+            "findings": findings,
             "scenario_name": slugify(scenario.name),
         }
 
@@ -228,7 +345,14 @@ def scenarios_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
-    return {"config": config, "model": model}
+    return {
+        "config": config,
+        "model": model,
+        "summaries": {
+            s.name: model.open_risk(f.threat_id for f in s.findings)
+            for s in model.scenarios
+        },
+    }
 
 
 def _threat_sort_key(item: tuple[str, Threat]) -> tuple:
@@ -292,10 +416,35 @@ def mitigations_view(
     model: ThreatModel,
 ) -> dict[str, Any]:
     rows = []
-    for mid in sorted(model.mitigations, key=scales.natural_key):
+    for rank, mid in enumerate(sorted(model.mitigations, key=scales.natural_key)):
         mitigating, proposing = model.mitigation_threats(mid)
-        rows.append((model.mitigations[mid], mitigating, proposing))
-    return {"config": config, "model": model, "rows": rows}
+        rows.append(
+            {
+                "mitigation": model.mitigations[mid],
+                "rank": rank,
+                "mitigating": mitigating,
+                "proposing": proposing,
+            }
+        )
+    return {
+        "config": config,
+        "model": model,
+        "rows": rows,
+        "statuses": [
+            s
+            for s in scales.MITIGATION_STATUSES
+            if any(m.status == s for m in model.mitigations.values())
+        ],
+    }
+
+
+@view("/backlog.html", log="Generating backlog.html...")
+def backlog_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Proposed mitigations, ranked by the highest risk they would reduce."""
+    return {"config": config, "model": model, "rows": model.backlog()}
 
 
 @view(
@@ -316,6 +465,7 @@ def mitigation_view(
             "mitigation": mitigation,
             "threats": mitigating,
             "further_threats": proposing,
+            "status_descriptions": scales.MITIGATION_STATUSES,
         }
 
 
@@ -351,3 +501,35 @@ def threat_actor_view(
             "actor_slug": slugify(name),
             "threats": threats,
         }
+
+
+@view("/internals.html", log="Generating internals.html...")
+def internals_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """Model internals: authoring aids kept out of the reader-facing pages."""
+    return {"config": config, "model": model}
+
+
+@view("/guide.html", log="Generating guide.html...")
+def guide_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    """How to read the model: statuses, the risk scale, and residual risk."""
+    impacts = sorted(scales.IMPACT_SCORES, key=scales.IMPACT_SCORES.get, reverse=True)
+    likelihoods = sorted(scales.LIKELIHOOD_SCORES, key=scales.LIKELIHOOD_SCORES.get)
+    return {
+        "config": config,
+        "model": model,
+        "threat_statuses": [
+            (s, description, s in scales.OPEN_STATUSES)
+            for s, description in scales.THREAT_STATUSES.items()
+        ],
+        "mitigation_statuses": list(scales.MITIGATION_STATUSES.items()),
+        "impacts": [(i, scales.IMPACT_SCORES[i]) for i in impacts],
+        "likelihoods": [(lk, scales.LIKELIHOOD_SCORES[lk]) for lk in likelihoods],
+        "risk_score": scales.risk_score,
+        "bands": scales.RISK_BANDS,
+    }

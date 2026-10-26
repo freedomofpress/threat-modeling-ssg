@@ -5,80 +5,60 @@
 {% block title %}Summary - Threat Model{% endblock %}
 
 {% block content %}
-{% set diagram_scenarios = model.scenarios | selectattr("dfd") | list %}
-{% if diagram_scenarios %}
-{% for scenario in diagram_scenarios %}
-<details class="scenario-diagram" name="scenario-picker"{% if loop.first %} open{% endif %}>
-    <summary>{{ scenario.name }}</summary>
-    {% with src=scenario.dfd %}{% include "includes/dfd_diagram.html" %}{% endwith %}
-</details>
-{% endfor %}
-{% endif %}
-
-<div class="stats">
-    <a href="/threats.html" class="count-box count-box--red">
-        <div class="count-box__value">{{ analysis.threat_counter | length }}</div>
-        <div class="count-box__note">of {{ model.threats | length }} defined</div>
-        <div class="count-box__label">Threats that apply</div>
-    </a>
-    <div class="count-box count-box--orange">
-        <div class="count-box__value">{{ model.scenarios | length }}</div>
-        <div class="count-box__label">Scenarios</div>
-    </div>
-    <a href="mitigations.html" class="count-box count-box--blue">
-        <div class="count-box__value">{{ model.mitigations | length }}</div>
-        <div class="count-box__label">Mitigations</div>
-    </a>
+<div class="summary-totals">
+    <a href="threats.html"><strong>{{ model.threats | length }}</strong> threats</a>
+    <span><strong>{{ analysis.threat_counter | length }}</strong> apply to components in scenarios</span>
+    <a href="mitigations.html"><strong>{{ model.mitigations | length }}</strong> mitigations</a>
+    <a href="scenarios.html"><strong>{{ model.scenarios | length }}</strong> scenarios</a>
 </div>
 
-{% if analysis.status_distribution %}
-<h2>Threats by status</h2>
-<div class="stats">
+<h2>Threats by status <a href="guide.html" class="section-link">What the statuses mean</a></h2>
+<div class="status-counts">
+    <a href="threats.html?status=open" class="count-box status-open-total">
+        <div class="count-box__value">{{ open_count }}</div>
+        <div class="count-box__label">Open</div>
+    </a>
     {% for status, count in analysis.status_distribution.items() %}
-    <div class="count-box status--{{ status | status_slug }}">
+    <a href="threats.html?status={{ status | urlencode }}" class="count-box status--{{ status | status_slug }}">
         <div class="count-box__value">{{ count }}</div>
         <div class="count-box__label">{{ status }}</div>
-    </div>
+    </a>
     {% endfor %}
 </div>
-{% endif %}
 
-<h2>Threats by frequency <a href="threats.html" class="section-link">See all threats →</a></h2>
+<h2>Top open risks <a href="threats.html?status=open" class="section-link">All open threats →</a></h2>
+{% if top_open %}
+<p class="muted">The highest risks after mitigations among unmanaged and partially mitigated threats that apply to a component.</p>
 <table>
     <thead>
         <tr>
-            <th>Threat ID</th>
-            <th>Description</th>
+            <th>Threat</th>
             <th>Status</th>
             <th>Risk</th>
-            <th>Occurrences</th>
+            <th>After mitigations</th>
+            <th>Components</th>
         </tr>
     </thead>
     <tbody>
-        {% set max_count = analysis.threats_by_frequency[0][1] if analysis.threats_by_frequency else 1 %}
-        {% for threat_id, count in analysis.threats_by_frequency %}
-        {% set pct = (count / max_count * 100) | int %}
+        {% for row in top_open %}
         <tr>
-            <td><a href="threat_{{ threat_id }}.html">{{ threat_id }}</a></td>
-            <td>{{ model.threats[threat_id].description }}</td>
-            <td>{{ m.status_badge(model.threats[threat_id].status) }}</td>
-            <td>{{ m.risk(model.threats[threat_id]) }}</td>
-            <td class="freq-cell" style="background: linear-gradient(to right, var(--color-7) {{ pct }}%, transparent {{ pct }}%)">{{ count }}</td>
+            <td>{{ m.threat_link(row.tid, row.threat) }}</td>
+            <td>{{ m.status_badge(row.threat.status) }}</td>
+            <td>{{ m.risk_value(row.threat.risk_score) }}</td>
+            <td>{{ m.risk_value(row.threat.residual_risk_score) }}</td>
+            <td class="register-list">{% for comp in row.components %}<a href="component_{{ comp | slugify }}.html">{{ comp }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+{% else %}
+<p>No open threats apply to any component.</p>
+{% endif %}
 
-<h2>Scenarios</h2>
+<h2>Scenarios <a href="scenarios.html" class="section-link">See all scenarios →</a></h2>
 <ul>
     {% for scenario in model.scenarios %}
-    <li><a href="scenario_{{ scenario.name | slugify }}.html">{{ scenario.name }}</a> — {{ scenario.findings | length }} findings</li>
+    <li><a href="scenario_{{ scenario.name | slugify }}.html">{{ scenario.name }}</a>{% if scenario.description %} <span class="muted">{{ scenario.description }}</span>{% endif %}</li>
     {% endfor %}
 </ul>
-
-{% endblock %}
-
-{% block scripts %}
-{% set has_dfd = model.scenarios | selectattr("dfd") | list | length > 0 %}
-{% include "includes/diagram_scripts.html" %}
 {% endblock %}

@@ -2,97 +2,47 @@
 {% import "includes/macros.html" as m %}
 {% set active_page = "threats.html" %}
 
-{% block title %}{{ threat_id }}: {{ threat.description }} - Threat Model{% endblock %}
+{% block title %}{{ threat.description or threat_id }} - Threat Model{% endblock %}
 
 {% block content %}
-<h1>
-	{% if threat.is_capec %}
-	<a href="https://capec.mitre.org/data/definitions/{{ threat_id.replace('CAPEC-', '') }}.html">
-	{{ threat_id }}: {{ threat.description }}
-	</a>
-	{% else %}
-	{{ threat_id }}: {{ threat.description }}
-	{% endif %}
-	{{ m.status_badge(threat.status) }}
+<h1 class="threat-title">
+    {{ threat.description or threat_id }}
+    {{ m.status_badge(threat.status) }}
 </h1>
+<p class="threat-id">
+    {% if threat.is_capec %}<a href="https://capec.mitre.org/data/definitions/{{ threat_id.replace('CAPEC-', '') }}.html">{{ threat_id }}</a>{% else %}{{ threat_id }}{% endif %}
+    · {{ threat.status | capitalize }}: {{ status_descriptions.get(threat.status, "") }}
+    {% if threat.source %}· {{ m.defined_in(config, threat.source) }}{% endif %}
+</p>
 
-<p>{{ threat.details }}</p>
+<dl class="risk-line">
+    <dt>Risk</dt>
+    <dd>{{ threat.impact_label }} impact × {{ threat.likelihood_label }} likelihood = {{ m.risk_value(threat.risk_score) }}</dd>
+    <dt>After mitigations</dt>
+    <dd>{{ threat.residual_impact_label }} impact × {{ threat.residual_likelihood_label }} likelihood = {{ m.risk_value(threat.residual_risk_score) }}{% if threat.residual_risk_score == threat.risk_score %} <span class="muted">(unchanged)</span>{% endif %}</dd>
+</dl>
+<p class="muted small"><a href="guide.html">How statuses and scores work</a></p>
 
-{% if threat.threat_actors %}
-<div class="tag-list">
-    {% for actor in threat.threat_actors %}
-    <a href="{{ actor | threat_actor_href }}" class="tag tag--text">{{ actor }}</a>
-    {% endfor %}
-</div>
-{% endif %}
+{% if threat.details %}<p>{{ threat.details }}</p>{% endif %}
 
 {% if threat.example %}
 <h2>Examples</h2>
 <p>{{ threat.example }}</p>
 {% endif %}
-{% if threat.comment %}
-<h2>Comment</h2>
-<p>{{ threat.comment }}</p>
-{% endif %}
 
-<div class="stats">
-    <div class="count-box count-box--{{ threat.impact_label | lower }}">
-        <div class="count-box__value">{{ threat.impact_label }}</div>
-        {% if threat.residual_impact_label != threat.impact_label %}
-        <div class="count-box__note">after mitigations: {{ threat.residual_impact_label }}</div>
-        {% endif %}
-        <div class="count-box__label">Impact</div>
-    </div>
-    <div class="count-box count-box--blue">
-        <div class="count-box__value">{{ threat.likelihood_label }}</div>
-        {% if threat.residual_likelihood_label != threat.likelihood_label %}
-        <div class="count-box__note">after mitigations: {{ threat.residual_likelihood_label }}</div>
-        {% endif %}
-        <div class="count-box__label">Likelihood</div>
-    </div>
-    <div class="count-box count-box--red">
-        <div class="count-box__value">{{ m.risk(threat) }}</div>
-        {% if threat.residual_risk_score != threat.risk_score %}
-        <div class="count-box__note">after mitigations: {{ threat.residual_risk_score if threat.residual_risk_score is not none else "Unknown" }}</div>
-        {% endif %}
-        <div class="count-box__label">Risk</div>
-    </div>
-    <div class="count-box count-box--orange">
-        <div class="count-box__value">{{ frequency }}</div>
-        <div class="count-box__note">occurrences in scenarios</div>
-        <div class="count-box__label">Frequency</div>
-    </div>
-    <div class="count-box count-box--blue">
-        <div class="count-box__value">{{ components | length }}</div>
-        <div class="count-box__label">Affected Components</div>
-    </div>
-    <div class="count-box count-box--orange">
-        <div class="count-box__value">{{ threat_scenario_data | length }}</div>
-        <div class="count-box__label">Affected Scenarios</div>
-    </div>
-</div>
-
-{% if threat.residual_risk %}
-<h2>Residual risk</h2>
-<p>{{ threat.residual_risk }}</p>
-{% endif %}
-
-<h2>Requirements</h2>
-<p>Component properties that must be true for this threat to apply:</p>
-<div class="tag-list">
-    {% for prop in threat.mapping.requirements %}
-    <a href="{{ prop | property_href }}" class="tag tag--true">{{ prop | display }}</a>
-    {% else %}
-    <em>None specified.</em>
+{% if threat.threat_actors %}
+<p>Threat actors:
+    {% for actor in threat.threat_actors %}
+    <a href="{{ actor | threat_actor_href }}" class="tag tag--text">{{ actor }}</a>
     {% endfor %}
-</div>
+</p>
+{% endif %}
 
 <h2>Mitigations</h2>
 {% if mitigations %}
 <table>
     <thead>
         <tr>
-            <th>ID</th>
             <th>Mitigation</th>
             <th>Status</th>
         </tr>
@@ -101,7 +51,6 @@
         {% for mit in mitigations %}
         <tr>
             <td>{{ m.mitigation_link(mit) }}</td>
-            <td>{{ mit.title }}</td>
             <td>{{ m.mitigation_status(mit) }}</td>
         </tr>
         {% endfor %}
@@ -115,9 +64,14 @@
 <h2>Possible further mitigations</h2>
 <ul class="prop-list">
     {% for mit in further_mitigations %}
-    <li>{{ m.mitigation_link(mit) }} <span class="prop-meta">{{ mit.title }}</span> {{ m.mitigation_status(mit) }}</li>
+    <li>{{ m.mitigation_link(mit) }} {{ m.mitigation_status(mit) }}</li>
     {% endfor %}
 </ul>
+{% endif %}
+
+{% if threat.residual_risk %}
+<h2>Residual risk</h2>
+<p>{{ threat.residual_risk }}</p>
 {% endif %}
 
 {% if children or parents %}
@@ -125,7 +79,7 @@
 {% if parents %}
 <p>This threat is part of:
     {% for pid, parent in parents %}
-    <a href="threat_{{ pid }}.html">{{ pid }}</a>{% if parent %} ({{ parent.description }}){% endif %}{% if not loop.last %}, {% endif %}
+    {{ m.threat_link(pid, parent) }}{% if not loop.last %}, {% endif %}
     {% endfor %}
 </p>
 {% endif %}
@@ -133,47 +87,30 @@
 <p>Smaller threats that make up this one:</p>
 <ul class="prop-list">
     {% for cid, child in children %}
-    <li><a href="threat_{{ cid }}.html">{{ cid }}</a>{% if child %} <span class="prop-meta">{{ child.description }}</span> {{ m.status_badge(child.status) }}{% endif %}</li>
+    <li>{{ m.threat_link(cid, child) }}{% if child %} {{ m.status_badge(child.status) }}{% endif %}</li>
     {% endfor %}
 </ul>
 {% endif %}
 {% endif %}
 
-<h2>Affected Components</h2>
+<h2>Where it applies</h2>
 {% if components %}
-<table>
-    <thead>
-        <tr>
-            <th>Component</th>
-            <th>Description</th>
-            <th>Boundary</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for comp_name in components %}
-        <tr>
-            <td><a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a></td>
-            <td>{{ model.components[comp_name].description if comp_name in model.components else 'N/A' }}</td>
-            <td>{{ model.components[comp_name].inBoundary if comp_name in model.components else 'N/A' }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No components affected by this threat.</p>
-{% endif %}
-
-<h2>Affected Scenarios</h2>
-{% if threat_scenario_data %}
+<p>Applies to {{ components | length }} component{{ "s" if components | length != 1 }} in {{ threat_scenario_data | length }} scenario{{ "s" if threat_scenario_data | length != 1 }}.</p>
+<ul class="prop-list">
+    {% for comp_name in components %}
+    {% set comp = model.components.get(comp_name) %}
+    <li>
+        <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>
+        {% if comp and comp.inBoundary %}<span class="prop-meta">{{ comp.inBoundary }}</span>{% endif %}
+    </li>
+    {% endfor %}
+</ul>
 {% for item in threat_scenario_data %}
-<details class="scenario-details" open>
+<details class="scenario-details">
     <summary>
         <a href="scenario_{{ item.scenario.name | slugify }}.html">{{ item.scenario.name }}</a>
         <span class="affected-components-inline">
-            — affects:
-            {% for comp in item.affected_components %}
-            <a href="component_{{ comp | slugify }}.html" class="tag tag--false">{{ comp }}</a>
-            {% endfor %}
+            · {{ item.affected_components | join(", ") }}
         </span>
     </summary>
     {% if item.highlighted_dfd %}
@@ -186,10 +123,25 @@
 </details>
 {% endfor %}
 {% else %}
-<p>No scenarios affected by this threat.</p>
+<p>This threat does not apply to any component in a scenario.</p>
 {% endif %}
 
-<p><a href="index.html">Back to Summary</a></p>
+{% if threat.comment %}
+<h2>Notes</h2>
+<p>{{ threat.comment }}</p>
+{% endif %}
+
+<details class="threat-matching">
+    <summary>How this threat is matched</summary>
+    <p>The threat applies to every component whose properties meet all of these requirements. See the <a href="threat_rules.html">matching rules</a> for every threat.</p>
+    <div class="tag-list">
+        {% for prop in threat.mapping.requirements %}
+        <a href="{{ prop | property_href }}" class="tag tag--true">{{ prop | display }}</a>
+        {% else %}
+        <em>None specified.</em>
+        {% endfor %}
+    </div>
+</details>
 {% endblock %}
 
 {% block scripts %}

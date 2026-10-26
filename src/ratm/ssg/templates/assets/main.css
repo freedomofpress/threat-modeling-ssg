@@ -1010,3 +1010,234 @@ td.prop-cell[class*="status--"] {
     color: var(--color-text-dim);
     font-size: 0.9em;
 }
+
+/* A threat or mitigation named by its title, with the id alongside. */
+.ref-id {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8em;
+    color: var(--color-text-dim);
+    white-space: nowrap;
+}
+
+.risk {
+    white-space: nowrap;
+}
+
+.risk-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.risk-band {
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-dim);
+}
+
+.risk-band--high {
+    color: var(--color-text);
+    font-weight: bold;
+}
+
+.muted {
+    color: var(--color-text-dim);
+}
+
+/* Filter bar above sortable tables. */
+.table-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    align-items: flex-end;
+    margin: 16px 0;
+}
+
+.table-filters label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8em;
+    color: var(--color-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.table-filters select,
+.table-filters input {
+    font: inherit;
+    font-size: 1.1em;
+    text-transform: none;
+    letter-spacing: normal;
+    padding: 4px 8px;
+    color: var(--color-text);
+    background: var(--color-bg-container);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    min-width: 12rem;
+}
+
+.table-count {
+    margin-left: auto;
+    color: var(--color-text-dim);
+    font-size: 0.9em;
+}
+
+/* Horizontal scroll for wide data tables. Unlike .table-scroll, cells still
+   wrap, so long titles don't push the other columns off-screen. */
+.scroll-x {
+    overflow-x: auto;
+}
+
+table[data-sortable] th button {
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+table[data-sortable] th[aria-sort="ascending"] button::after { content: " \25B2"; }
+table[data-sortable] th[aria-sort="descending"] button::after { content: " \25BC"; }
+
+.register td {
+    vertical-align: top;
+}
+
+.register-threat {
+    min-width: 16rem;
+}
+
+.register-list {
+    font-size: 0.9em;
+    min-width: 10rem;
+}
+
+.internals-list {
+    display: grid;
+    gap: 8px;
+}
+
+.footer-nav {
+    margin-bottom: 8px;
+}
+
+/* Summary: plain totals line above the status counts. */
+.summary-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin-bottom: 24px;
+    color: var(--color-text-dim);
+}
+
+.summary-totals strong {
+    color: var(--color-text);
+    font-size: 1.3em;
+}
+
+/* The "Open" total groups unmanaged and partially mitigated threats. */
+.count-box.status-open-total {
+    background-color: var(--status-open-bg);
+    color: var(--status-open-fg);
+    border: 1px solid var(--status-open-bg);
+}
+
+.count-box.status-open-total .count-box__value,
+.count-box.status-open-total .count-box__label {
+    color: inherit;
+}
+
+/* Summary status counts: compact tiles on a grid, so every status stays on
+   one or two even rows instead of stretching a lone tile across the page. */
+.status-counts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: 10px;
+    margin-bottom: 28px;
+}
+
+.status-counts .count-box {
+    margin: 0;
+    padding: 12px 10px 30px;
+}
+
+.status-counts .count-box__value {
+    font-size: 2.4em;
+    margin-bottom: 4px;
+}
+
+/* Threat page: title, id, and the risk line lead the page. */
+.threat-title {
+    margin-bottom: 4px;
+}
+
+.threat-id {
+    margin-top: 0;
+    font-size: 0.9em;
+    color: var(--color-text-dim);
+}
+
+.risk-line {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px 16px;
+    margin: 16px 0 4px;
+    padding: 12px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 1.1em;
+}
+
+.risk-line dt {
+    color: var(--color-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.8em;
+    align-self: center;
+}
+
+.risk-line dd {
+    margin: 0;
+}
+
+.small {
+    font-size: 0.85em;
+}
+
+.threat-matching {
+    margin-top: 32px;
+}
+
+.threat-matching summary {
+    cursor: pointer;
+    color: var(--color-text-dim);
+}
+
+.footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+}
+
+/* Guide: the impact x likelihood grid. */
+.risk-grid td,
+.risk-grid th {
+    text-align: center;
+}
+
+.risk-cell {
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.risk-cell--high {
+    font-weight: bold;
+}
+
+.defined-in code {
+    font-size: 0.95em;
+}
+
