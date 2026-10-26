@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Threat Model{% endblock %}</title>
     <script>
+        // Choose the theme before the page is drawn. A ?theme= parameter in
+        // the address wins over the theme saved in localStorage. The script
+        // at the end of the page explains when links carry ?theme=.
         (function() {
-            var t = localStorage.getItem('theme');
-            if (t) document.documentElement.setAttribute('data-theme', t);
+            var t = new URLSearchParams(window.location.search).get('theme');
+            try { t = t || localStorage.getItem('theme'); } catch (e) { /* localStorage is disabled, so keep the default theme */ }
+            if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
         })();
     </script>
     <link rel="stylesheet" href="assets/main.css">
@@ -48,11 +52,56 @@
         (function() {
             var input = document.getElementById('theme-toggle-input');
             var root  = document.documentElement;
+            var XLINK = 'http://www.w3.org/1999/xlink';
+            // When the site is opened from disk (file://), Firefox gives each
+            // page its own localStorage, so a theme saved on one page is not
+            // seen on the next. In that case, also add ?theme= to the links
+            // between pages, and read it back in the script at the top.
+            var fromDisk = window.location.protocol === 'file:';
+
+            function tagLink(a) {
+                // Links inside the diagrams are SVG links, which can keep their
+                // target in xlink:href instead of href.
+                var svg = !a.hasAttribute('href') && a.hasAttributeNS(XLINK, 'href');
+                var href = svg ? a.getAttributeNS(XLINK, 'href') : a.getAttribute('href');
+                if (!href || href.charAt(0) === '#') return;
+                // Only change links to other pages of this site. A link that was
+                // changed before already holds a full file:// URL, so compare the
+                // URL it resolves to, not the href text.
+                var url = new URL(href, window.location.href);
+                if (url.protocol !== window.location.protocol || url.host !== window.location.host) return;
+                url.searchParams.set('theme', root.getAttribute('data-theme'));
+                if (svg) a.setAttributeNS(XLINK, 'xlink:href', url.href);
+                else a.setAttribute('href', url.href);
+            }
+            function tagLinks(node) {
+                if (node.nodeType !== 1) return;
+                if (node.matches('a')) tagLink(node);
+                node.querySelectorAll('a').forEach(tagLink);
+            }
+
             input.checked = (root.getAttribute('data-theme') === 'light');
+            if (fromDisk) {
+                tagLinks(document.body);
+                // The diagrams are drawn after the page loads, so also change the
+                // links they add as they appear.
+                new MutationObserver(function(records) {
+                    records.forEach(function(r) { r.addedNodes.forEach(tagLinks); });
+                }).observe(document.body, { childList: true, subtree: true });
+            }
             input.addEventListener('change', function() {
                 var theme = input.checked ? 'light' : 'dark';
                 root.setAttribute('data-theme', theme);
-                localStorage.setItem('theme', theme);
+                try { localStorage.setItem('theme', theme); } catch (e) { /* localStorage is disabled, so the theme is not saved */ }
+                if (fromDisk) {
+                    tagLinks(document.body);
+                    // Also put ?theme= in this page's own address, so a reload keeps it.
+                    try {
+                        var here = new URL(window.location.href);
+                        here.searchParams.set('theme', theme);
+                        history.replaceState(null, '', here.href);
+                    } catch (e) { /* some browsers block replaceState on file:// pages */ }
+                }
                 document.dispatchEvent(new CustomEvent('theme-changed'));
             });
         })();
