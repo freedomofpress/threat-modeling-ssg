@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from typing import Any, TextIO
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
@@ -237,7 +238,7 @@ class ThreatModel(BaseModel):
         ]
 
     def component_unimplemented_mitigations(
-        self, component: Component, threat_ids: set[str]
+        self, component: Component, threat_ids: Iterable[str]
     ) -> list[str]:
         missing: set[str] = set()
         for tid in threat_ids:
