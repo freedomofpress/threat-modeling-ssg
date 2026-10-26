@@ -55,6 +55,25 @@
     --color-count-blue-glow:  rgba( 84,  78, 104, 0.4);
     --color-count-teal-glow:  rgba( 32,  60,  86, 0.4);
     --color-count-grey-glow:  rgba( 13,  43,  69, 0.4);
+    /* Status colors, as background/text pairs. Each pair has a contrast ratio
+       of at least 4.5:1, the WCAG AA minimum for body text. The more a status
+       needs attention, the more it stands out. Unmanaged is the strongest
+       color, then partially mitigated, then the other managed statuses.
+       Mitigated and avoided sit close to the page background, and out of scope
+       is only an outline. The variable names use short group names: open
+       (unmanaged), partial, managed, done (mitigated, avoided) and none (out
+       of scope). */
+    --status-open-bg:         var(--color-5);
+    --status-open-fg:         var(--color-1);
+    --status-partial-bg:      var(--color-6);
+    --status-partial-fg:      var(--color-1);
+    --status-managed-bg:      var(--color-3);
+    --status-managed-fg:      var(--color-8);
+    --status-done-bg:         var(--color-2);
+    --status-done-fg:         var(--color-8);
+    --status-done-border:     var(--color-3);
+    --status-none-fg:         var(--color-7);
+    --status-none-border:     var(--color-3);
 
     /* Layout */
     --table-col-width:    36px;
@@ -97,6 +116,11 @@
     --color-count-blue-glow:  rgba( 84,  78, 104, 0.35);
     --color-count-teal-glow:  rgba( 32,  60,  86, 0.35);
     --color-count-grey-glow:  rgba( 13,  43,  69, 0.35);
+    --status-done-bg:         var(--color-7);
+    --status-done-fg:         var(--color-1);
+    --status-done-border:     var(--color-7);
+    --status-none-fg:         var(--color-3);
+    --status-none-border:     var(--color-3);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -823,7 +847,7 @@ a.count-box:hover {
 .count-box--orange, .count-box--high                         { background: var(--color-count-orange); box-shadow: 0 0 10px var(--color-count-orange-glow); }
 .count-box--blue, .count-box--medium                         { background: var(--color-count-blue);   box-shadow: 0 0 10px var(--color-count-blue-glow); }
 .count-box--teal, .count-box--low                            { background: var(--color-count-teal);   box-shadow: 0 0 10px var(--color-count-teal-glow); }
-.count-box--grey                                             { background: var(--color-count-grey);   box-shadow: 0 0 10px var(--color-count-grey-glow); }
+.count-box--grey, .count-box--unknown                        { background: var(--color-count-grey);   box-shadow: 0 0 10px var(--color-count-grey-glow); }
 
 .count-box--red:hover    { box-shadow: 0 8px 20px var(--color-count-red-glow); }
 .count-box--orange:hover { box-shadow: 0 8px 20px var(--color-count-orange-glow); }
@@ -903,4 +927,86 @@ svg a {
 
     text { text-decoration: none; }
     &:hover text { text-decoration: underline; }
+}
+
+/* Colors for threat and mitigation statuses. Each status--* class sets the
+   pair of variables below. Badges, summary count boxes and matrix cells all
+   read them, so a status looks the same everywhere. */
+.status--unmanaged, .status--proposed {
+    --status-bg: var(--status-open-bg);
+    --status-fg: var(--status-open-fg);
+    --status-border: var(--status-open-bg);
+}
+.status--partially-mitigated {
+    --status-bg: var(--status-partial-bg);
+    --status-fg: var(--status-partial-fg);
+    --status-border: var(--status-partial-bg);
+}
+.status--accepted, .status--transferred, .status--inform, .status--optional {
+    --status-bg: var(--status-managed-bg);
+    --status-fg: var(--status-managed-fg);
+    --status-border: var(--status-managed-bg);
+}
+.status--mitigated, .status--avoided, .status--implemented {
+    --status-bg: var(--status-done-bg);
+    --status-fg: var(--status-done-fg);
+    --status-border: var(--status-done-border);
+}
+.status--out-of-scope {
+    --status-bg: transparent;
+    --status-fg: var(--status-none-fg);
+    --status-border: var(--status-none-border);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.status-badge,
+.count-box[class*="status--"] {
+    background-color: var(--status-bg);
+    color: var(--status-fg);
+    border: 1px solid var(--status-border);
+}
+
+.status-badge.status--out-of-scope,
+.count-box.status--out-of-scope {
+    border-style: dashed;
+}
+
+.count-box[class*="status--"] .count-box__value,
+.count-box[class*="status--"] .count-box__label,
+.count-box[class*="status--"] .count-box__note {
+    color: inherit;
+}
+
+.risk-score {
+    font-family: var(--font-mono, monospace);
+    color: var(--color-text-dim);
+}
+
+/* A filled matrix cell means the threat applies to that component. The dot
+   takes the status text color, which has at least 4.5:1 contrast with the
+   cell background, the WCAG AA minimum for body text. */
+td.prop-cell[class*="status--"] {
+    background-color: var(--status-bg);
+    color: var(--status-fg);
+    font-weight: bold;
+}
+
+.status-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 10px 0 20px;
+    color: var(--color-text-dim);
+    font-size: 0.9em;
 }

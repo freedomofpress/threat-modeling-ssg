@@ -4,9 +4,11 @@ from ratm.ssg.models import (
     Component,
     Finding,
     Flow,
+    Mitigation,
     Property,
     Scenario,
     Threat,
+    ThreatActor,
     ThreatMapping,
     ThreatModel,
     _token_props,
@@ -16,12 +18,16 @@ from ratm.ssg.models import (
 
 @pytest.fixture()
 def model_factory():
-    def _make(threats, components, scenarios, properties=None):
+    def _make(
+        threats, components, scenarios, properties=None, mitigations=None, actors=None
+    ):
         return ThreatModel(
             threats=threats,
             components=components,
             scenarios=scenarios,
             properties=properties or {},
+            mitigations=mitigations or {},
+            threat_actors=actors or {},
         )
 
     return _make
@@ -104,16 +110,15 @@ def test_threat_linked_scenarios(model_factory) -> None:
 def test_threat_mapping_base_props() -> None:
     mapping = ThreatMapping(
         requirements=["loads_resources.images", "reads_input"],
-        mitigations=["verifies_resources.images", "is_trusted"],
+        mitigations=["M-VERIFY", "M-TRUST"],
     )
     assert mapping.requirement_props == {"loads_resources", "reads_input"}
-    assert mapping.mitigation_props == {"verifies_resources", "is_trusted"}
+    assert mapping.mitigations == ["M-VERIFY", "M-TRUST"]
 
 
 def test_threat_mapping_for_prop() -> None:
     mapping = ThreatMapping(
         requirements=["loads_resources.images", "loads_resources.deps", "reads_input"],
-        mitigations=["verifies_resources.images", "is_trusted"],
     )
     assert mapping.requirements_for_prop("loads_resources") == [
         "loads_resources.images",
@@ -121,145 +126,6 @@ def test_threat_mapping_for_prop() -> None:
     ]
     assert mapping.requirements_for_prop("reads_input") == ["reads_input"]
     assert mapping.requirements_for_prop("other") == []
-    assert mapping.mitigations_for_prop("verifies_resources") == [
-        "verifies_resources.images"
-    ]
-    assert mapping.mitigations_for_prop("is_trusted") == ["is_trusted"]
-    assert mapping.mitigations_for_prop("other") == []
-
-
-def test_property_mitigates_threats(model_factory) -> None:
-    model = model_factory(
-        threats={
-            "T1": Threat(
-                SID="T1",
-                mapping=ThreatMapping(
-                    requirements=["reads_input"], mitigations=["sanitizes_input"]
-                ),
-            ),
-        },
-        components={
-            "A": Component(
-                name="A",
-                component_class="Process",
-                properties={"reads_input": True, "sanitizes_input": True},
-            ),
-            "B": Component(name="B", component_class="Process"),
-        },
-        scenarios=[
-            Scenario(
-                name="S1",
-                findings=[Finding(target="A", threat_id="T1")],
-                flows=[FLOW_A_B],
-            )
-        ],
-        properties={
-            "reads_input": Property(name="Reads input", type="bool"),
-            "sanitizes_input": Property(name="Sanitizes input", type="bool"),
-        },
-    )
-    mitigated, would_mitigate, _ = model.property_mitigation_state("sanitizes_input")
-    assert [tid for tid, _ in mitigated] == ["T1"]
-    assert [tid for tid, _ in would_mitigate] == []
-
-
-def test_property_would_mitigate_threats(model_factory) -> None:
-    model = model_factory(
-        threats={
-            "T1": Threat(
-                SID="T1",
-                mapping=ThreatMapping(
-                    requirements=["reads_input"], mitigations=["sanitizes_input"]
-                ),
-            ),
-        },
-        components={
-            "A": Component(
-                name="A",
-                component_class="Process",
-                properties={"reads_input": True, "sanitizes_input": False},
-            ),
-            "B": Component(name="B", component_class="Process"),
-        },
-        scenarios=[
-            Scenario(
-                name="S1",
-                findings=[Finding(target="A", threat_id="T1")],
-                flows=[FLOW_A_B],
-            )
-        ],
-        properties={
-            "reads_input": Property(name="Reads input", type="bool"),
-            "sanitizes_input": Property(name="Sanitizes input", type="bool"),
-        },
-    )
-    mitigated, would_mitigate, _ = model.property_mitigation_state("sanitizes_input")
-    assert [tid for tid, _ in mitigated] == []
-    assert [tid for tid, _ in would_mitigate] == ["T1"]
-
-
-def test_property_mitigation_state_dotted(model_factory) -> None:
-    """Dotted mitigations: component with correct sub-item is mitigated, wrong sub-item is not."""
-    model = model_factory(
-        threats={
-            "T-dotted-ok": Threat(
-                SID="T-dotted-ok",
-                mapping=ThreatMapping(
-                    requirements=["loads_resources.system"],
-                    mitigations=["verifies_resources.system"],
-                ),
-            ),
-            "T-dotted-miss": Threat(
-                SID="T-dotted-miss",
-                mapping=ThreatMapping(
-                    requirements=["loads_resources.images"],
-                    mitigations=["verifies_resources.images"],
-                ),
-            ),
-        },
-        components={
-            "Covered": Component(
-                name="Covered",
-                component_class="Process",
-                properties={
-                    "loads_resources": ["system"],
-                    "verifies_resources": ["system"],
-                },
-            ),
-            "Affected": Component(
-                name="Affected",
-                component_class="Process",
-                properties={
-                    "loads_resources": ["images"],
-                    "verifies_resources": ["updates"],
-                },
-            ),
-        },
-        scenarios=[
-            Scenario(
-                name="S1",
-                findings=[
-                    Finding(target="Covered", threat_id="T-dotted-ok"),
-                    Finding(target="Affected", threat_id="T-dotted-miss"),
-                ],
-                flows=[
-                    Flow(
-                        id="1",
-                        name="Covered to Affected",
-                        source="Covered",
-                        sink="Affected",
-                    )
-                ],
-            )
-        ],
-        properties={
-            "loads_resources": Property(name="Loads resources", type="list"),
-            "verifies_resources": Property(name="Verifies resources", type="list"),
-        },
-    )
-    mitigated, would_mitigate, _ = model.property_mitigation_state("verifies_resources")
-    assert [tid for tid, _ in mitigated] == ["T-dotted-ok"]
-    assert [tid for tid, _ in would_mitigate] == ["T-dotted-miss"]
 
 
 def test_property_requiring_threats(model_factory) -> None:
@@ -310,187 +176,6 @@ def test_property_requiring_threats(model_factory) -> None:
     assert requiring == ["T-active"]
 
 
-def test_is_mitigated_no_mitigations() -> None:
-    """A threat with no mitigations defined is never considered mitigated."""
-    threat = Threat(SID="T1", mapping=ThreatMapping(mitigations=[]))
-    comp = Component(name="X", properties={"anything": True})
-    assert threat.is_mitigated(comp) is False
-
-
-def test_is_mitigated_boolean() -> None:
-    """Boolean mitigation: True = mitigated, False or missing = not mitigated."""
-    threat = Threat(SID="T1", mapping=ThreatMapping(mitigations=["is_sandboxed"]))
-    assert (
-        threat.is_mitigated(Component(name="X", properties={"is_sandboxed": True}))
-        is True
-    )
-    assert (
-        threat.is_mitigated(Component(name="X", properties={"is_sandboxed": False}))
-        is False
-    )
-    assert threat.is_mitigated(Component(name="X", properties={})) is False
-
-
-def test_is_mitigated_dotted() -> None:
-    """Dotted mitigation: correct sub-item = mitigated, wrong or missing sub-item = not mitigated."""
-    threat = Threat(
-        SID="T1",
-        mapping=ThreatMapping(
-            requirements=["loads_resources.images"],
-            mitigations=["verifies_resources.images"],
-        ),
-    )
-    assert (
-        threat.is_mitigated(
-            Component(name="X", properties={"verifies_resources": ["images"]})
-        )
-        is True
-    )
-    assert (
-        threat.is_mitigated(
-            Component(name="X", properties={"verifies_resources": ["updates"]})
-        )
-        is False
-    )
-    assert (
-        threat.is_mitigated(
-            Component(name="X", properties={"verifies_resources": None})
-        )
-        is False
-    )
-    assert threat.is_mitigated(Component(name="X", properties={})) is False
-
-
-def test_is_mitigated_any_one_is_enough() -> None:
-    """Any single satisfied mitigation is enough; not all are required."""
-    threat = Threat(
-        SID="T1",
-        mapping=ThreatMapping(
-            requirements=["loads_resources.system"],
-            mitigations=["is_trusted", "verifies_resources.system"],
-        ),
-    )
-    # Neither satisfied
-    assert threat.is_mitigated(Component(name="X", properties={})) is False
-    # Only the boolean one satisfied
-    assert (
-        threat.is_mitigated(Component(name="X", properties={"is_trusted": True}))
-        is True
-    )
-    # Only the dotted one satisfied
-    assert (
-        threat.is_mitigated(
-            Component(name="X", properties={"verifies_resources": ["system"]})
-        )
-        is True
-    )
-    # Both satisfied
-    assert (
-        threat.is_mitigated(
-            Component(
-                name="X",
-                properties={"is_trusted": True, "verifies_resources": ["system"]},
-            )
-        )
-        is True
-    )
-
-
-def test_threat_unimplemented_boolean(model_factory) -> None:
-    """Boolean mitigation: True = implemented, False or missing = unimplemented."""
-    threat = Threat(SID="T1", mapping=ThreatMapping(mitigations=["is_sandboxed"]))
-    model = model_factory(
-        threats={"T1": threat},
-        components={},
-        scenarios=[],
-    )
-    assert (
-        model.threat_unimplemented_mitigations(
-            Component(name="X", properties={"is_sandboxed": True}), threat
-        )
-        == []
-    )
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={"is_sandboxed": False}), threat
-    ) == ["is_sandboxed"]
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={}), threat
-    ) == ["is_sandboxed"]
-
-
-def test_threat_unimplemented_dotted(model_factory) -> None:
-    """Dotted mitigation: correct sub-item = implemented, wrong or missing = unimplemented."""
-    threat = Threat(
-        SID="T1",
-        mapping=ThreatMapping(
-            requirements=["loads_resources.images"],
-            mitigations=["verifies_resources.images"],
-        ),
-    )
-    model = model_factory(
-        threats={"T1": threat},
-        components={},
-        scenarios=[],
-    )
-    assert (
-        model.threat_unimplemented_mitigations(
-            Component(name="X", properties={"verifies_resources": ["images"]}), threat
-        )
-        == []
-    )
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={"verifies_resources": ["updates"]}), threat
-    ) == ["verifies_resources.images"]
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={"verifies_resources": None}), threat
-    ) == ["verifies_resources.images"]
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={}), threat
-    ) == ["verifies_resources.images"]
-
-
-def test_threat_unimplemented_multiple(model_factory) -> None:
-    """Multiple mitigations: returns only the unimplemented ones."""
-    threat = Threat(
-        SID="T1",
-        mapping=ThreatMapping(
-            requirements=["loads_resources.system"],
-            mitigations=["is_trusted", "verifies_resources.system"],
-        ),
-    )
-    model = model_factory(
-        threats={"T1": threat},
-        components={},
-        scenarios=[],
-    )
-    # Neither mitigation implemented
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={}), threat
-    ) == ["is_trusted", "verifies_resources.system"]
-
-    # Only is_trusted implemented
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={"is_trusted": True}), threat
-    ) == ["verifies_resources.system"]
-
-    # Only verifies_resources.system implemented
-    assert model.threat_unimplemented_mitigations(
-        Component(name="X", properties={"verifies_resources": ["system"]}), threat
-    ) == ["is_trusted"]
-
-    # Both implemented
-    assert (
-        model.threat_unimplemented_mitigations(
-            Component(
-                name="X",
-                properties={"is_trusted": True, "verifies_resources": ["system"]},
-            ),
-            threat,
-        )
-        == []
-    )
-
-
 @pytest.mark.parametrize(
     ("token", "expected"),
     [
@@ -536,12 +221,176 @@ def test_token_props(token, expected) -> None:
 
 def test_mapping_props_cover_negated_and_compared_tokens() -> None:
     mapping = ThreatMapping(
-        requirements=["stores_secrets", "!encrypts_secrets"],
-        mitigations=["requires_credentials != uses_strong_credentials"],
+        requirements=[
+            "stores_secrets",
+            "!encrypts_secrets",
+            "requires_credentials != uses_strong_credentials",
+        ],
     )
-    assert mapping.requirement_props == {"stores_secrets", "encrypts_secrets"}
-    assert mapping.requirements_for_prop("encrypts_secrets") == ["!encrypts_secrets"]
-    assert mapping.mitigation_props == {
+    assert mapping.requirement_props == {
+        "stores_secrets",
+        "encrypts_secrets",
         "requires_credentials",
         "uses_strong_credentials",
     }
+    assert mapping.requirements_for_prop("encrypts_secrets") == ["!encrypts_secrets"]
+
+
+SANITIZE = Mitigation(id="M-SANITIZE", title="Sanitize input")
+DOCS = Mitigation(id="M-DOCS", title="Document it", status="optional")
+
+
+def test_threat_mitigations_and_mitigation_threats(model_factory) -> None:
+    model = model_factory(
+        threats={
+            "T1": Threat(
+                SID="T1",
+                mapping=ThreatMapping(
+                    mitigations=["M-SANITIZE"], further_mitigations=["M-DOCS"]
+                ),
+            ),
+            "T2": Threat(SID="T2", mapping=ThreatMapping(mitigations=["M-DOCS"])),
+        },
+        components={},
+        scenarios=[],
+        mitigations={"M-SANITIZE": SANITIZE, "M-DOCS": DOCS},
+    )
+    t1 = model.threats["T1"]
+    assert [m.id for m in model.threat_mitigations(t1)] == ["M-SANITIZE"]
+    assert [m.id for m in model.threat_mitigations(t1, further=True)] == ["M-DOCS"]
+    mitigating, proposing = model.mitigation_threats("M-DOCS")
+    assert [tid for tid, _ in mitigating] == ["T2"]
+    assert [tid for tid, _ in proposing] == ["T1"]
+
+
+def test_threat_impact_and_scores() -> None:
+    assert Threat.model_validate({"SID": "T", "impact": "Low"}).impact == "Low"
+    threat = Threat(SID="T", impact="High", likelihood="Medium")
+    assert threat.impact_label == "High"
+    assert threat.risk_score == 9
+    assert threat.residual_risk_score == 9
+    threat = Threat(
+        SID="T",
+        impact="High",
+        likelihood="Medium",
+        residual_impact="Low",
+        residual_likelihood="Very Low",
+    )
+    assert threat.residual_risk_score == 1
+    unknown = Threat(SID="T", impact="Critical")
+    assert unknown.impact_label == "Unknown"
+    assert unknown.likelihood_label == "Unknown"
+    assert unknown.risk_score is None
+    assert Threat(SID="T", status="partially mitigated").status_slug == (
+        "partially-mitigated"
+    )
+    assert Threat(SID="CAPEC-1").is_capec is True
+    assert Threat(SID="T").is_capec is False
+
+
+def test_analysis_distributions_and_actors(model_factory) -> None:
+    model = model_factory(
+        threats={
+            "T1": Threat(
+                SID="T1", impact="High", status="mitigated", threat_actors=["Any"]
+            ),
+            "T2": Threat(SID="T2", impact="Low", status="unmanaged"),
+            "T3": Threat(SID="T3", status="unmanaged", threat_actors=["Any", "Troll"]),
+        },
+        components={
+            "A": Component(name="A", component_class="Process"),
+            "B": Component(name="B", component_class="Process"),
+        },
+        scenarios=[
+            Scenario(
+                name="S1",
+                findings=[
+                    Finding(target="A", threat_id="T1"),
+                    Finding(target="B", threat_id="T2"),
+                ],
+                flows=[FLOW_A_B],
+            )
+        ],
+        actors={"Any": ThreatActor(name="Any"), "Troll": ThreatActor(name="Troll")},
+    )
+    analysis = model.analyze()
+    assert analysis["impact_distribution"] == {"High": 1, "Low": 1}
+    assert analysis["status_distribution"] == {"unmanaged": 1, "mitigated": 1}
+    # The actor mapping includes every defined threat, even ones no scenario finds.
+    assert analysis["actors_to_threats"] == {"Any": ["T1", "T3"], "Troll": ["T3"]}
+
+
+def test_parent_threats(model_factory) -> None:
+    model = model_factory(
+        threats={
+            "T1": Threat(SID="T1", children=["T2", "T3"]),
+            "T2": Threat(SID="T2", children=["T3"]),
+            "T3": Threat(SID="T3"),
+        },
+        components={},
+        scenarios=[],
+    )
+    assert model.parent_threats("T3") == ["T1", "T2"]
+    assert model.parent_threats("T1") == []
+
+
+def test_entity_lists_are_keyed() -> None:
+    model = ThreatModel.model_validate(
+        {
+            "threats": [{"SID": "T1"}],
+            "components": {},
+            "scenarios": [],
+            "properties": {},
+            "mitigations": [{"id": "M1", "title": "t"}],
+            "threat_actors": [{"name": "Any"}],
+        }
+    )
+    assert list(model.threats) == ["T1"]
+    assert list(model.mitigations) == ["M1"]
+    assert list(model.threat_actors) == ["Any"]
+
+
+def test_threats_by_risk_order() -> None:
+    """Residual risk first, then base risk, then natural id. Unknown risk last."""
+    model = ThreatModel(
+        threats={
+            "T10": Threat(SID="T10", impact="High", likelihood="High"),
+            "T2": Threat(SID="T2", impact="High", likelihood="High"),
+            "T3": Threat(
+                SID="T3",
+                impact="High",
+                likelihood="High",
+                residual_likelihood="Very Low",
+            ),
+            "T4": Threat(SID="T4", impact="Low", likelihood="Low"),
+            "T5": Threat(SID="T5"),
+            "T1": Threat(SID="T1"),
+        },
+        components={},
+        scenarios=[],
+        properties={},
+    )
+    assert [tid for tid, _ in model.threats_by_risk()] == [
+        "T2",
+        "T10",
+        "T3",
+        "T4",
+        "T1",
+        "T5",
+    ]
+    assert [tid for tid, _ in model.threats_by_risk(["T4", "T3"])] == ["T3", "T4"]
+
+
+def test_threat_open_and_bands() -> None:
+    threat = Threat(
+        SID="T",
+        status="partially mitigated",
+        impact="High",
+        likelihood="High",
+        residual_likelihood="Low",
+    )
+    assert threat.is_open is True
+    assert threat.risk_band == "high"
+    assert threat.residual_risk_band == "medium"
+    assert Threat(SID="T", status="accepted").is_open is False
+    assert Threat(SID="T").risk_band is None

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "includes/macros.html" as m %}
 
 {% block title %}{{ comp_name }} - Threat Model{% endblock %}
 
@@ -18,16 +19,6 @@
     {% endfor %}
 </div>
 
-{% if unimplemented_mitigations %}
-<h2>Potential Mitigations</h2>
-    <p>Properties not currently implemented that would mitigate applicable threats:</p>
-    <div class="tag-list">
-        {% for prop in unimplemented_mitigations %}
-        <span class="tag tag--false">{{ prop | replace('_', ' ') }}</span>
-        {% endfor %}
-    </div>
-{% endif %}
-
 <h2>Threats Affecting This Component</h2>
 {% if threats %}
 <table>
@@ -36,7 +27,8 @@
             <th>Threat ID</th>
             <th>Name</th>
             <th>Description</th>
-            <th>Potential Mitigations</th>
+            <th>Status</th>
+            <th>Mitigations</th>
         </tr>
     </thead>
     <tbody>
@@ -46,9 +38,10 @@
             <td><a href="threat_{{ threat_id }}.html">{{ threat_id }}</a></td>
             <td>{{ threat.description }}</td>
             <td>{{ threat.details }}</td>
+            <td>{{ m.status_badge(threat.status) }}</td>
             <td>
-                {% for mit in threat_unimplemented[threat_id] %}
-                <a href="property_{{ mit.split('.')[0] | slugify }}.html" class="tag tag--false">{{ mit | replace('_', ' ') | replace('.', ' · ') }}</a>
+                {% for mit in model.threat_mitigations(threat) %}
+                <a href="{{ mit.id | mitigation_href }}" class="tag tag--text" title="{{ mit.title }}">{{ mit.id }}</a>
                 {% endfor %}
             </td>
         </tr>
