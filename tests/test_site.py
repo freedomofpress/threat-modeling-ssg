@@ -1,15 +1,24 @@
 """Author a model, generate the report, then render and check the site."""
 
+import filecmp
 import html
 import json
+import os
 import re
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from ratm import Ratm
 from ratm.components import CAPECInfo, Scenario
 from ratm.ssg.cli import build_env
 from ratm.ssg.models import SiteConfig, ThreatModel
 from ratm.ssg.utils import render_views
+
+ROOT = Path(__file__).parent.parent
+DEMO = ROOT / "demo" / "model.py"
 
 
 def author_model(description: str = "A request comes in") -> dict:
@@ -78,3 +87,60 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
     # they would be escaped and shown as literal text.
     matrix = (tmp_path / "threats_components.html").read_text()
     assert "✓" in matrix or "✗" in matrix
+
+
+def build_demo_site(out: Path, hash_seed: int) -> None:
+    """Run `demo/model.py | ratm -o out` under a fixed string hash seed."""
+    env = {
+        **os.environ,
+        "PYTHONHASHSEED": str(hash_seed),
+        "PYTHONPATH": os.pathsep.join(
+            filter(None, [str(ROOT / "src"), os.environ.get("PYTHONPATH")])
+        ),
+    }
+    # ratm loads config.toml from the current directory. Run from `out` so a config.toml
+    # wherever the tests run cannot change the build.
+    report = subprocess.run(
+        [sys.executable, str(DEMO)],
+        env=env,
+        cwd=out,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    subprocess.run(
+        [sys.executable, "-c", "from ratm.ssg.cli import main; main()", "-o", "."],
+        input=report,
+        env=env,
+        cwd=out,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+
+def differing_files(a: Path, b: Path) -> list[str]:
+    cmp = filecmp.dircmp(a, b)
+    assert not cmp.left_only and not cmp.right_only
+    _, differ, errors = filecmp.cmpfiles(a, b, cmp.common_files, shallow=False)
+    differ += errors
+    for sub in cmp.common_dirs:
+        differ += [f"{sub}/{name}" for name in differing_files(a / sub, b / sub)]
+    return differ
+
+
+@pytest.mark.skipif(not DEMO.exists(), reason="demo model missing")
+def test_builds_are_reproducible(tmp_path: Path) -> None:
+    # Python randomizes string hashing in each process, and that decides the order in
+    # which a set of strings is iterated. Two builds in this process would always match,
+    # so build in separate processes with different PYTHONHASHSEED values and compare
+    # the output.
+    builds = []
+    for seed in (0, 1, 2):
+        out = tmp_path / f"seed{seed}"
+        out.mkdir()
+        build_demo_site(out, seed)
+        builds.append(out)
+    assert (builds[0] / "threat_RATM-4-EXEC.html").exists()
+    for other in builds[1:]:
+        assert differing_files(builds[0], other) == [], other.name
