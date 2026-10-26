@@ -144,3 +144,10 @@ def test_builds_are_reproducible(tmp_path: Path) -> None:
     assert (builds[0] / "threat_RATM-4-EXEC.html").exists()
     for other in builds[1:]:
         assert differing_files(builds[0], other) == [], other.name
+
+
+def test_scenario_without_description_loads_on_the_site(tmp_path: Path) -> None:
+    report = author_model(description=None)
+    assert report["scenarios"][0]["description"] == ""
+    render(report, tmp_path)
+    assert (tmp_path / "scenario_Handle_request.html").is_file()
