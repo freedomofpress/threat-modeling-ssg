@@ -17,7 +17,7 @@
         </select>
     </label>
     <label>Search
-        <input type="search" name="q" id="mitigations-search" placeholder="Title or id">
+        <input type="search" name="q" id="mitigations-search" placeholder="Title, id, or tag">
     </label>
     <output class="table-count" data-count-for="mitigation-list">{{ rows | length }} mitigations</output>
 </form>
@@ -36,7 +36,7 @@
         {% for row in rows %}
         {% set mit = row.mitigation %}
         <tr data-status="{{ mit.status }}"
-            data-q="{{ [mit.id, mit.title] | join(' ') | lower }}"
+            data-q="{{ [mit.id, mit.title, mit.tags | join(' ')] | join(' ') | lower }}"
             data-sort-id="{{ row.rank }}"
             data-sort-mitigates="{{ row.mitigating | length }}"
             data-sort-proposed="{{ row.proposing | length }}">

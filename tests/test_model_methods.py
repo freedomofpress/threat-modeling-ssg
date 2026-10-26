@@ -7,12 +7,12 @@ from ratm.ssg.models import (
     Mitigation,
     Property,
     Scenario,
+    TestRef,
     Threat,
     ThreatActor,
     ThreatMapping,
     ThreatModel,
     _token_props,
-    _token_satisfied,
 )
 
 
@@ -179,33 +179,6 @@ def test_property_requiring_threats(model_factory) -> None:
 @pytest.mark.parametrize(
     ("token", "expected"),
     [
-        ("is_exposed", True),
-        ("!is_exposed", False),
-        ("encrypts_secrets", False),
-        ("!encrypts_secrets", True),
-        ("loads_resources.deps", True),
-        ("loads_resources.source", False),
-        ("!loads_resources.source", True),
-        ("requires_credentials == uses_strong_credentials", False),
-        ("requires_credentials != uses_strong_credentials", True),
-    ],
-)
-def test_token_satisfied(token, expected) -> None:
-    component = Component(
-        name="A",
-        component_class="Process",
-        properties={
-            "is_exposed": True,
-            "loads_resources": ["deps"],
-            "requires_credentials": True,
-        },
-    )
-    assert _token_satisfied(component, token) is expected
-
-
-@pytest.mark.parametrize(
-    ("token", "expected"),
-    [
         ("is_exposed", ["is_exposed"]),
         ("!encrypts_secrets", ["encrypts_secrets"]),
         ("verifies_resources.deps", ["verifies_resources"]),
@@ -314,7 +287,6 @@ def test_analysis_distributions_and_actors(model_factory) -> None:
         actors={"Any": ThreatActor(name="Any"), "Troll": ThreatActor(name="Troll")},
     )
     analysis = model.analyze()
-    assert analysis["impact_distribution"] == {"High": 1, "Low": 1}
     # Status counts include every defined threat, as the register's status filter does,
     # and put the statuses most in need of attention first, so unmanaged comes before
     # mitigated.
@@ -354,8 +326,63 @@ def test_entity_lists_are_keyed() -> None:
     assert list(model.threat_actors) == ["Any"]
 
 
+def test_mitigation_has_test() -> None:
+    assert DOCS.has_test is False
+    ref = TestRef(repo="org/app", path="tests/x.py", name="test_x")
+    assert Mitigation(id="M", title="t", tests=[ref]).has_test is True
+
+
+def test_test_coverage(model_factory) -> None:
+    ref = TestRef(repo="org/app", path="tests/test_a.py", name="test_a")
+
+    def mit(mid, **kwargs):
+        return Mitigation(id=mid, title=mid, **kwargs)
+
+    mitigations = [
+        mit("M10", verification="test", tests=[ref]),
+        mit("M2", verification="test"),
+        mit("M1", verification="test", tests=[ref, ref]),
+        mit("M3", verification="test"),
+        mit("M-INSPECT", verification="inspection", tests=[ref]),
+        mit("M-ANALYSIS", verification="analysis"),
+        mit("M-NONE"),
+        mit("M-NONE-2"),
+        mit("M-PLANNED", status="proposed", verification="test", tests=[ref]),
+        mit("M-OPT", status="optional", verification="test"),
+    ]
+    model = model_factory(
+        threats={},
+        components={},
+        scenarios=[],
+        mitigations={m.id: m for m in mitigations},
+    )
+    coverage = model.test_coverage()
+    # Uncovered first, then ids in number order.
+    assert [m.id for m in coverage["counted"]] == ["M2", "M3", "M1", "M10"]
+    assert coverage["covered"] == 2
+    assert coverage["ratio"] == 0.5
+    assert coverage["implemented"] == 8
+    assert coverage["methods"] == {"inspection": 1, "analysis": 1}
+    assert coverage["unclassified"] == 2
+    # Tests that point at mitigations the ratio leaves out.
+    assert [m.id for m in coverage["not_counted"]] == ["M-INSPECT", "M-PLANNED"]
+
+
+def test_test_coverage_with_nothing_to_measure(model_factory) -> None:
+    model = model_factory(
+        threats={},
+        components={},
+        scenarios=[],
+        mitigations={"M1": Mitigation(id="M1", title="One")},
+    )
+    coverage = model.test_coverage()
+    assert coverage["counted"] == [] and coverage["ratio"] is None
+    assert coverage["unclassified"] == 1
+
+
 def test_threats_by_risk_order() -> None:
-    """Residual risk first, then base risk, then natural id. Unknown risk last."""
+    """Residual risk first, then base risk, then id with numbers compared by value (T2
+    before T10). Unknown risk last."""
     model = ThreatModel(
         threats={
             "T10": Threat(SID="T10", impact="High", likelihood="High"),
@@ -385,19 +412,9 @@ def test_threats_by_risk_order() -> None:
     assert [tid for tid, _ in model.threats_by_risk(["T4", "T3"])] == ["T3", "T4"]
 
 
-def test_threat_open_and_bands() -> None:
-    threat = Threat(
-        SID="T",
-        status="partially mitigated",
-        impact="High",
-        likelihood="High",
-        residual_likelihood="Low",
-    )
-    assert threat.is_open is True
-    assert threat.risk_band == "high"
-    assert threat.residual_risk_band == "medium"
+def test_threat_is_open() -> None:
+    assert Threat(SID="T", status="partially mitigated").is_open is True
     assert Threat(SID="T", status="accepted").is_open is False
-    assert Threat(SID="T").risk_band is None
 
 
 def test_backlog_ranks_proposed_mitigations_by_threat_risk(model_factory) -> None:
@@ -472,3 +489,94 @@ def test_open_risk_summary() -> None:
         "top_risk": 6,
     }
     assert model.open_risk(["T3"]) == {"total": 1, "open": 0, "top_risk": None}
+
+
+# -- Tags
+
+
+def tagged_model(model_factory, threat_components):
+    """A model where A and B are tagged "Legacy", C is not, and threat Tn is found on
+    the components listed for it in threat_components."""
+    components = {
+        "A": Component(name="A", tags=["Legacy"]),
+        "B": Component(name="B", tags=["Legacy", "Lab"]),
+        "C": Component(name="C"),
+    }
+    findings = [
+        Finding(target=comp, threat_id=tid)
+        for tid, comps in threat_components.items()
+        for comp in comps
+    ]
+    flows = [
+        Flow(id="1", name="A to B", source="A", sink="B"),
+        Flow(id="2", name="B to C", source="B", sink="C"),
+    ]
+    threats = {tid: Threat(SID=tid) for tid in threat_components}
+    return model_factory(
+        threats=threats,
+        components=components,
+        scenarios=[Scenario(name="S1", flows=flows, findings=findings)],
+    )
+
+
+def test_threat_takes_the_tags_all_its_components_share(model_factory) -> None:
+    model = tagged_model(model_factory, {"T1": ["A", "B"], "T2": ["A", "C"]})
+    model.resolve_tags()
+    assert model.threats["T1"].tags == ["Legacy"]
+    assert model.threats["T2"].tags == []
+
+
+def test_threat_keeps_its_own_tags(model_factory) -> None:
+    model = tagged_model(model_factory, {"T1": ["C"], "T2": []})
+    model.threats["T1"].tags = ["Legacy"]
+    model.threats["T2"].tags = ["Lab"]
+    model.resolve_tags()
+    assert model.threats["T1"].tags == ["Legacy"]
+    # Found on no component, so nothing is inherited.
+    assert model.threats["T2"].tags == ["Lab"]
+
+
+def test_mitigation_takes_the_tags_all_its_threats_share(model_factory) -> None:
+    model = tagged_model(model_factory, {"T1": ["A"], "T2": ["B"], "T3": ["C"]})
+    model.threats["T1"].mapping.mitigations = ["M-OLD", "M-BOTH"]
+    model.threats["T2"].mapping.further_mitigations = ["M-OLD"]
+    model.threats["T3"].mapping.mitigations = ["M-BOTH"]
+    model.mitigations = {
+        "M-OLD": Mitigation(id="M-OLD"),
+        "M-BOTH": Mitigation(id="M-BOTH"),
+        "M-UNUSED": Mitigation(id="M-UNUSED"),
+    }
+    model.resolve_tags()
+    assert model.mitigations["M-OLD"].tags == ["Legacy"]
+    assert model.mitigations["M-BOTH"].tags == []
+    assert model.mitigations["M-UNUSED"].tags == []
+
+
+def test_listed_threats_reach_nested_boundaries(model_factory) -> None:
+    def boundary(name, inside=None):
+        return Component(name=name, component_class="Boundary", in_boundary=inside)
+
+    model = model_factory(
+        threats={
+            "T-OUTER": Threat(
+                SID="T-OUTER", mapping=ThreatMapping(components=["Outer"])
+            ),
+            "T-INNER": Threat(
+                SID="T-INNER", mapping=ThreatMapping(components=["Inner"])
+            ),
+            "T-PROPS": Threat(SID="T-PROPS", mapping=ThreatMapping(requirements=["x"])),
+        },
+        components={
+            "Outer": boundary("Outer"),
+            "Inner": boundary("Inner", inside="Outer"),
+            # Two boundaries inside each other must not loop.
+            "Loop A": boundary("Loop A", inside="Loop B"),
+            "Loop B": boundary("Loop B", inside="Loop A"),
+        },
+        scenarios=[],
+    )
+    assert model.enclosing_names("Inner") == ["Inner", "Outer"]
+    assert [tid for tid, _ in model.listed_threats("Outer")] == ["T-OUTER"]
+    assert [tid for tid, _ in model.listed_threats("Inner")] == ["T-INNER", "T-OUTER"]
+    assert model.enclosing_names("Loop A") == ["Loop A", "Loop B"]
+    assert model.listed_threats("Loop A") == []

@@ -59,7 +59,23 @@
         {% endfor %}
     </tbody>
 </table>
+<p>A mitigation marked <em>has automated test</em> has at least one automated test that checks it. The mitigation's page lists them.</p>
+
+<h2 id="verification">Verification</h2>
+<p>Each mitigation can record how it is shown to work. A mitigation with no method recorded has not been classified yet.</p>
+<table>
+    <thead><tr><th>Method</th><th>Meaning</th></tr></thead>
+    <tbody>
+        {% for method, meaning in verification_methods %}
+        <tr><td>{{ method }}</td><td>{{ meaning }}</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p><a href="coverage.html">Test coverage</a> counts only implemented mitigations verified by test, and shows how many of them have at least one test. Many controls, such as a trusted hosting location or code review, can't be checked by a test, so a percentage over every mitigation would mislead.</p>
 
 <h2 id="matching">Where threats apply</h2>
-<p>Each component has properties, such as whether it is exposed to the network. A threat applies to every component whose properties meet all of its requirements. Scenarios show those components in context. The <a href="internals.html">model internals</a> pages show the rules themselves.</p>
+<p>A threat applies to the components its authors list for it, where listing a boundary covers every component inside it. It can also apply through component properties, such as whether a component is exposed to the network. Then it applies to every component whose properties meet all of its requirements. Each threat page says which way it is matched under <em>How this threat is matched</em>. Scenarios show those components in context. The <a href="internals.html">model internals</a> pages show the rules themselves.</p>
+
+<h2 id="tags">Tags</h2>
+<p>A label such as <span class="item-tag">Legacy</span> next to a name is a tag set by the model's authors, for example to mark parts of an older setup. Components with a tag are drawn with a dashed outline in the diagrams. A threat carries a tag when every component it applies to has that tag, and a mitigation carries a tag when every threat that lists it does. Tags do not change which threats apply or how risk is counted.</p>
 {% endblock %}

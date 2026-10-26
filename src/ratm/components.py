@@ -111,6 +111,12 @@ class ComponentProperties:
         return getattr(self, prop_left.strip()) == getattr(self, prop_right.strip())
 
     def matches(self, expr: str):
+        # "a | b" matches when either side does. Split on "|" before anything else, so
+        # each side can use the other operators.
+        if "|" in expr:
+            return any(self.matches(part) for part in expr.split("|"))
+
+        expr = expr.strip()
         if expr.startswith("!"):
             # Check if the component property is missing, False, or empty list.
             prop = expr.removeprefix("!")
@@ -150,6 +156,9 @@ class Component:
     properties: ComponentProperties = None
     type: str = "Component"
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    # Labels shown next to the item on the site, such as "Legacy". Threats and
+    # mitigations also get the tags shared by everything they apply to.
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
@@ -183,6 +192,16 @@ class Component:
         changes = self.properties.to_nondefault_dict()
         return dataclasses.replace(boundary_properties, **changes)
 
+    @property
+    def enclosing_names(self) -> list[str]:
+        """This component's name, then each boundary around it, innermost first."""
+        names, seen, current = [], set(), self
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            names.append(current.name)
+            current = current.boundary
+        return names
+
     def matches(self, expr: str):
         combined = self.combined_properties
         if combined:
@@ -196,6 +215,7 @@ class Component:
             "name": self.name,
             "properties": self.combined_properties.to_nondefault_dict(),
             "source": _source_dict(self.source),
+            "tags": list(self.tags),
         }
 
 
@@ -298,6 +318,23 @@ class CAPECInfo:
 
 
 @dataclass
+class TestRef:
+    """An automated test that checks a mitigation, in some code repository."""
+
+    # Not a pytest test class, despite the name.
+    __test__ = False
+
+    repo: str
+    path: str
+    name: str
+    line: int = None
+    url: str = None
+
+    def to_dict(self):
+        return dataclasses.asdict(self)
+
+
+@dataclass
 class Mitigation:
     """A control that reduces one or more threats."""
 
@@ -305,12 +342,23 @@ class Mitigation:
     title: str
     description: str = None
     status: str = scales.DEFAULT_MITIGATION_STATUS
+    # One of scales.VERIFICATION_METHODS, or None until someone classifies it.
+    verification: str = None
+    tests: list[TestRef] = dataclasses.field(default_factory=list)
 
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
             self.source = _caller_source()
+        self.tests = [
+            TestRef(**ref) if isinstance(ref, dict) else ref for ref in self.tests
+        ]
+
+    @property
+    def has_test(self):
+        return bool(self.tests)
 
     def to_dict(self):
         return {
@@ -318,7 +366,10 @@ class Mitigation:
             "title": self.title,
             "description": self.description or "",
             "status": self.status,
+            "verification": self.verification,
+            "tests": [ref.to_dict() for ref in self.tests],
             "source": _source_dict(self.source),
+            "tags": list(self.tags),
         }
 
 
@@ -344,10 +395,15 @@ class ThreatActor:
 
 @dataclass
 class Threat:
-    """The requirements, mitigations, and risk information for a threat."""
+    """The requirements, mitigations, and risk information for a threat.
+
+    A threat applies to the components named in `components` (a boundary covers
+    everything inside it, at any depth) and to every component whose properties meet all
+    of its `requirements`.
+    """
 
     id: str
-    requirements: list[str]
+    requirements: list[str] = dataclasses.field(default_factory=list)
     mitigations: list[str] = dataclasses.field(default_factory=list)
     capec_info: CAPECInfo = None
     comment: str = None
@@ -360,7 +416,9 @@ class Threat:
     further_mitigations: list[str] = dataclasses.field(default_factory=list)
     children: list[str] = dataclasses.field(default_factory=list)
     threat_actors: list[str] = dataclasses.field(default_factory=list)
+    components: list[str] = dataclasses.field(default_factory=list)
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
@@ -414,14 +472,13 @@ class Threat:
         self.capec_info = CAPECInfo.from_capec_entry(entry)
 
     def matches(self, component: Component):
+        """True if the component is listed (directly or through a boundary around it) or
+        meets every requirement."""
+        if self.components and set(component.enclosing_names) & set(self.components):
+            return True
         if not self.requirements:
-            raise ValueError(f"Threat {self} does not have requirements")
-
-        for req in self.requirements:
-            if not component.matches(req):
-                return False
-
-        return True
+            return False
+        return all(component.matches(req) for req in self.requirements)
 
     def to_dict(self):
         info = self.capec_info.to_dict() if self.capec_info else CAPECInfo("").to_dict()
@@ -439,7 +496,9 @@ class Threat:
         info["mapping"]["requirements"] = self.requirements
         info["mapping"]["mitigations"] = list(self.mitigations)
         info["mapping"]["further_mitigations"] = list(self.further_mitigations)
+        info["mapping"]["components"] = list(self.components)
         info["source"] = _source_dict(self.source)
+        info["tags"] = list(self.tags)
         return info
 
 
@@ -460,6 +519,7 @@ class Scenario:
     description: str = None
     findings: list[Finding] | None = None
     source: tuple = dataclasses.field(default=None, compare=False, repr=False)
+    tags: list[str] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         if self.source is None:
@@ -470,7 +530,12 @@ class Scenario:
         for flow in self.dataflows:
             if flow.labels and label in flow.labels:
                 new_flows.append(flow)
-        return self.__class__(name=name, dataflows=new_flows, description=description)
+        return self.__class__(
+            name=name,
+            dataflows=new_flows,
+            description=description,
+            tags=list(self.tags),
+        )
 
     def iter_components(self):
         """Iterate the components referenced by a scenario."""
@@ -501,6 +566,7 @@ class Scenario:
             "name": self.name,
             "flows": [f.to_dict() for f in self.dataflows],
             "findings": [dataclasses.asdict(f) for f in self.findings],
+            "tags": list(self.tags),
         }
 
     def Dataflow(self, dataflow_cls=Dataflow, *args, **kwargs):

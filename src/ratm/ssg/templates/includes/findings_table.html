@@ -16,7 +16,7 @@
         {% set threat = finding.threat %}
         <tr>
             <td>{{ m.threat_link(finding.tid, threat) }}</td>
-            <td><a href="component_{{ finding.target | slugify }}.html">{{ finding.target }}</a></td>
+            <td><a href="component_{{ finding.target | slugify }}.html">{{ finding.target }}</a>{{ m.tag_badges(model.component_tags(finding.target)) }}</td>
             <td>{{ m.status_badge(threat.status) }}</td>
             <td>{{ m.risk_value(threat.risk_score) }}</td>
             <td>{{ m.risk_value(threat.residual_risk_score) }}</td>

@@ -56,7 +56,7 @@
         {% endif %}
         <tr>
             <td class="prop-sticky">
-                <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>
+                <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>{{ m.tag_badges(model.component_tags(comp_name)) }}
             </td>
             {% for tid, threat in active_threats %}
             {% if comp_name in applies[tid] %}

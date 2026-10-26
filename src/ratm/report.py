@@ -1,5 +1,13 @@
 from . import scales
-from .components import Component, Mitigation, Property, Scenario, Threat, ThreatActor
+from .components import (
+    Component,
+    Mitigation,
+    Property,
+    Scenario,
+    TestRef,
+    Threat,
+    ThreatActor,
+)
 
 
 class Report:
@@ -50,15 +58,43 @@ class Report:
         threat_ids = _unique_ids("threat", [t.id for t in self.threats])
         mitigation_ids = _unique_ids("mitigation", [m.id for m in self.mitigations])
         actor_names = _unique_ids("threat actor", [a.name for a in self.threat_actors])
+        # Registered components, plus every boundary around them, so a report built from
+        # scenarios alone still knows its boundaries.
+        component_names = {
+            name for comp in self.components for name in comp.enclosing_names
+        }
+
+        for kind, items, key in (
+            ("Component", self.components, "name"),
+            ("Scenario", self.scenarios, "name"),
+            ("Threat", self.threats, "id"),
+            ("Mitigation", self.mitigations, "id"),
+        ):
+            for item in items:
+                _check_tags(f"{kind} {getattr(item, key)}", item.tags)
 
         for mit in self.mitigations:
             if mit.status not in scales.MITIGATION_STATUSES:
                 raise ValueError(
                     f"Mitigation {mit.id} has unknown status '{mit.status}'"
                 )
+            if (
+                mit.verification is not None
+                and mit.verification not in scales.VERIFICATION_METHODS
+            ):
+                raise ValueError(
+                    f"Mitigation {mit.id} has unknown verification '{mit.verification}'"
+                )
+            for ref in mit.tests:
+                _check_test_ref(f"Mitigation {mit.id}", ref)
 
         for threat in self.threats:
             prefix = f"Threat {threat.id}"
+            if not threat.requirements and not threat.components:
+                raise ValueError(f"{prefix} has neither requirements nor components")
+            for name in threat.components:
+                if name not in component_names:
+                    raise ValueError(f"{prefix} refers to unknown component '{name}'")
             if threat.status not in scales.THREAT_STATUSES:
                 raise ValueError(f"{prefix} has unknown status '{threat.status}'")
             _check_label(prefix, "impact", threat.impact_label, scales.IMPACT_SCORES)
@@ -114,3 +150,30 @@ def _unique_ids(kind: str, ids: list[str]) -> set[str]:
 def _check_label(prefix: str, field: str, value: str | None, scale: dict) -> None:
     if value is not None and value not in scale:
         raise ValueError(f"{prefix} has unknown {field} '{value}'")
+
+
+def _check_tags(prefix: str, tags) -> None:
+    if not isinstance(tags, (list, tuple)) or not all(
+        isinstance(tag, str) and tag for tag in tags
+    ):
+        raise ValueError(f"{prefix} tags must be a list of non-empty strings")
+
+
+def _check_test_ref(prefix: str, ref) -> None:
+    if not isinstance(ref, TestRef):
+        # A ValueError rather than a TypeError, because validate() reports every problem
+        # in the model as a ValueError.
+        raise ValueError(f"{prefix} tests must be TestRef objects")  # noqa: TRY004
+    for field in ("repo", "path", "name"):
+        value = getattr(ref, field)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"{prefix} test {field} must be a non-empty string")
+    if ref.line is not None and (
+        isinstance(ref.line, bool) or not isinstance(ref.line, int) or ref.line < 1
+    ):
+        raise ValueError(f"{prefix} test {ref.name} has invalid line {ref.line!r}")
+    # The site puts the URL in a link, and autoescaping does not stop a javascript: URL.
+    if ref.url is not None and not (
+        isinstance(ref.url, str) and ref.url.startswith(("https://", "http://"))
+    ):
+        raise ValueError(f"{prefix} test {ref.name} has a URL that is not http(s)")

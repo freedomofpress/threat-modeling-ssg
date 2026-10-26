@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% import "includes/macros.html" as m %}
+{% set active_page = "coverage.html" %}
+{% block title %}Test coverage - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Test coverage</h1>
+
+<p>Implemented mitigations whose verification method is <em>test</em>, and whether at least one automated test checks each of them. Tests name the mitigations they check. The model's authors gather those references from the code repositories. See <a href="guide.html#verification">how to read this model</a> for the verification methods.</p>
+
+{% set counted = coverage.counted | length %}
+{% if counted %}
+<div class="status-counts">
+    <span class="count-box status--implemented">
+        <div class="count-box__value">{{ (coverage.ratio * 100) | round | int }}%</div>
+        <div class="count-box__label">Covered</div>
+    </span>
+    <a href="coverage.html?tests=yes" class="count-box status--implemented">
+        <div class="count-box__value">{{ coverage.covered }}</div>
+        <div class="count-box__label">With tests</div>
+    </a>
+    <a href="coverage.html?tests=no" class="count-box status--proposed">
+        <div class="count-box__value">{{ counted - coverage.covered }}</div>
+        <div class="count-box__label">Without tests</div>
+    </a>
+</div>
+{% endif %}
+
+<p>{% if counted %}{{ coverage.covered }} of {{ counted }} implemented mitigation{{ "s" if counted != 1 }} verified by test {{ "has" if coverage.covered == 1 else "have" }} at least one test.{% else %}No implemented mitigation is marked as verified by test yet, so there is nothing to measure.{% endif %}
+{% if uncounted %}Implemented mitigations not counted: {% for part in uncounted %}{{ part }}{% if loop.revindex == 2 %}{{ "," if uncounted | length > 2 }} and {% elif not loop.last %}, {% endif %}{% endfor %}.{% endif %}</p>
+
+{% if counted %}
+<form class="table-filters" data-filter-for="coverage-list">
+    <label>Tests
+        <select name="tests" id="coverage-tests">
+            <option value="">Any</option>
+            <option value="yes">With tests</option>
+            <option value="no">Without tests</option>
+        </select>
+    </label>
+    <label>Search
+        <input type="search" name="q" id="coverage-search" placeholder="Title, id, test, or repository">
+    </label>
+    <output class="table-count" data-count-for="coverage-list">{{ counted }} mitigations</output>
+</form>
+
+<div class="scroll-x">
+<table id="coverage-list" data-sortable>
+    <thead>
+        <tr>
+            <th aria-sort="none"><button type="button" data-sort-key="id" data-sort-first="asc">Mitigation</button></th>
+            <th aria-sort="ascending"><button type="button" data-sort-key="tests" data-sort-first="asc">Tests</button></th>
+            <th>Repositories</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mit in coverage.counted %}
+        <tr data-tests="{{ 'yes' if mit.tests else 'no' }}"
+            data-q="{{ [mit.id, mit.title, mit.tests | map(attribute='name') | join(' '), mit.tests | map(attribute='repo') | join(' ')] | join(' ') | lower }}"
+            data-sort-id="{{ id_rank[mit.id] }}"
+            data-sort-tests="{{ mit.tests | length }}">
+            <td>{{ m.mitigation_link(mit) }}</td>
+            <td>{% if mit.tests %}{{ m.count(mit.tests | length, "test") }}{% else %}<strong>None</strong>{% endif %}</td>
+            <td class="register-list">{{ mit.tests | map(attribute='repo') | unique | join(", ") }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+
+{% if coverage.not_counted %}
+<h2>Tests that don't count toward coverage</h2>
+<p>Tests name these mitigations, but the mitigations are not implemented, or are not marked as verified by test. Their verification method may need updating.</p>
+<div class="scroll-x">
+<table>
+    <thead>
+        <tr>
+            <th>Mitigation</th>
+            <th>Status</th>
+            <th>Verification</th>
+            <th>Tests</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mit in coverage.not_counted %}
+        <tr>
+            <td>{{ m.mitigation_link(mit) }}</td>
+            <td>{{ m.status_badge(mit.status) }}</td>
+            <td>{{ mit.verification or "Not set" }}</td>
+            <td>{{ m.count(mit.tests | length, "test") }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% include "includes/table_tools.html" %}
+{% endblock %}

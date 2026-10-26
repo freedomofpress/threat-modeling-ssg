@@ -1,10 +1,21 @@
 """Tests for the model code: the Ratm builders, Threat, Mitigation, and Report."""
 
 import inspect
+import json
 
 import pytest
 
-from ratm import CAPECInfo, Mitigation, Ratm, Report, Scenario, Threat, ThreatActor
+from ratm import (
+    CAPECInfo,
+    Mitigation,
+    Ratm,
+    Report,
+    Scenario,
+    TestRef,
+    Threat,
+    ThreatActor,
+)
+from ratm.ssg.models import ThreatModel, _token_props
 
 
 @pytest.fixture()
@@ -20,6 +31,7 @@ def tm() -> Ratm:
     tm.Mitigation(
         "M-VERIFY",
         title="Verify resources",
+        tests=[{"repo": "org/app", "path": "tests/test_deps.py", "name": "test_d"}],
         status="proposed",
     )
     tm.Mitigation("M-DOCS", title="Document the risk", status="optional")
@@ -39,15 +51,54 @@ def make_scenario(tm: Ratm) -> Scenario:
 # -- Mitigation and ThreatActor entities
 
 
-def test_mitigation_to_dict() -> None:
+def test_mitigation_to_dict_and_has_test() -> None:
     mit = Mitigation("M1", title="T", source=("model.py", 3))
+    assert mit.has_test is False
     assert mit.to_dict() == {
         "id": "M1",
         "title": "T",
         "description": "",
         "status": "implemented",
+        "verification": None,
+        "tests": [],
         "source": {"file": "model.py", "line": 3},
+        "tags": [],
     }
+    assert Mitigation("M2", title="T", tests=[REF]).has_test is True
+
+
+REF = {
+    "repo": "org/app",
+    "path": "tests/test_x.py",
+    "name": "test_x",
+    "line": 4,
+    "url": "https://example.com/org/app/blob/abc/tests/test_x.py#L4",
+}
+
+
+def test_mitigation_test_refs_and_verification() -> None:
+    mit = Mitigation(
+        "M1",
+        title="T",
+        verification="test",
+        tests=[TestRef(**REF), {**REF, "name": "test_y", "line": None, "url": None}],
+    )
+    # Dicts, as loaded from a scan file, become TestRef objects.
+    assert all(isinstance(ref, TestRef) for ref in mit.tests)
+    assert mit.has_test is True
+    data = mit.to_dict()
+    assert data["verification"] == "test"
+    assert data["tests"] == [
+        REF,
+        {**REF, "name": "test_y", "line": None, "url": None},
+    ]
+
+
+def test_test_refs_added_after_registration_reach_the_report(tm: Ratm) -> None:
+    """A model can register mitigations first and attach scan results later."""
+    tm.mitigations["M-SANITIZE"].tests.append(TestRef(**REF))
+    report = tm.Report([make_scenario(tm)]).generate()
+    assert report["mitigations"]["M-SANITIZE"]["tests"] == [REF]
 
 
 def test_threat_actor_to_dict() -> None:
@@ -138,6 +189,7 @@ def test_threat_to_dict_shape() -> None:
         "requirements": ["reads_input"],
         "mitigations": ["M-SANITIZE"],
         "further_mitigations": ["M-VERIFY"],
+        "components": [],
     }
 
 
@@ -164,11 +216,15 @@ def test_report_emits_entities_and_all_findings(tm: Ratm) -> None:
         "mitigations",
         "threat_actors",
     }
+    assert report["mitigations"]["M-VERIFY"]["tests"][0]["path"] == (
+        "tests/test_deps.py"
+    )
     assert report["threat_actors"]["Nation state"]["description"] == (
         "Well-resourced adversary"
     )
     targets = sorted(f["target"] for f in report["scenarios"][0]["findings"])
-    # A sanitizes its input but the finding is still reported.
+    # Component A has sanitizes_input, but the threat is still reported for it, because
+    # mitigations don't remove findings.
     assert targets == ["A", "B"]
 
 
@@ -206,6 +262,42 @@ def test_report_validates_mitigation_status(tm: Ratm) -> None:
     tm.Mitigation("M-BAD", title="Bad", status="done")
     with pytest.raises(ValueError, match="M-BAD.*status.*done"):
         tm.Report([make_scenario(tm)]).generate()
+
+
+def test_report_validates_verification(tm: Ratm) -> None:
+    scenario = make_scenario(tm)
+    for method in ("test", "inspection", "analysis", "demonstration", None):
+        tm.mitigations["M-DOCS"].verification = method
+        tm.Report([scenario]).generate()
+    tm.Mitigation("M-BAD", title="Bad", verification="tested")
+    with pytest.raises(ValueError, match="M-BAD.*verification.*tested"):
+        tm.Report([scenario]).generate()
+
+
+@pytest.mark.parametrize(
+    ("ref", "message"),
+    [
+        (REF, None),
+        ({**REF, "line": None, "url": None}, None),
+        ({**REF, "url": "http://example.com/t.py"}, None),
+        ({**REF, "repo": ""}, "test repo must be a non-empty string"),
+        ({**REF, "path": None}, "test path must be a non-empty string"),
+        ({**REF, "name": ""}, "test name must be a non-empty string"),
+        ({**REF, "line": "4"}, "test test_x has invalid line '4'"),
+        ({**REF, "line": 0}, "test test_x has invalid line 0"),
+        ({**REF, "line": True}, "test test_x has invalid line True"),
+        ({**REF, "url": "javascript:alert(1)"}, "test test_x has a URL that is not"),
+        ({**REF, "url": "example.com/t.py"}, "test test_x has a URL that is not"),
+        ("tests/test_x.py", "tests must be TestRef objects"),
+    ],
+)
+def test_report_validates_test_refs(tm: Ratm, ref, message) -> None:
+    tm.mitigations["M-DOCS"].tests = [TestRef(**ref) if isinstance(ref, dict) else ref]
+    if message is None:
+        tm.Report([make_scenario(tm)]).generate()
+    else:
+        with pytest.raises(ValueError, match=f"M-DOCS {message}"):
+            tm.Report([make_scenario(tm)]).generate()
 
 
 def test_report_validates_duplicate_threat_ids() -> None:
@@ -258,3 +350,153 @@ def test_source_is_the_model_code_that_called_a_helper(tm: Ratm) -> None:
     # The source is the call inside the helper, not a line inside ratm.
     assert threat.source[0] == "tests/test_authoring.py"
     assert threat.source[1] == register.__code__.co_firstlineno + 1
+
+
+# -- "Any of" requirements
+
+
+@pytest.mark.parametrize(
+    ("token", "expected"),
+    [
+        ("reads_input | sanitizes_input", True),
+        ("sanitizes_input | reads_input", True),
+        ("sanitizes_input | is_exposed", False),
+        ("sanitizes_input|reads_input", True),
+        ("loads_resources.images | loads_resources.deps", True),
+        ("loads_resources.images | verifies_resources.images", False),
+        ("!reads_input | is_exposed", False),
+        ("!sanitizes_input | is_exposed", True),
+        ("reads_input == is_exposed | reads_input", True),
+    ],
+)
+def test_any_of_requirements(token, expected) -> None:
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties(
+        "reads_input",
+        "sanitizes_input",
+        "is_exposed",
+        ("loads_resources", "Loads resources", (), tuple),
+        ("verifies_resources", "Verifies resources", (), tuple),
+    )
+    comp = tm.Component(name="C", reads_input=True, loads_resources=("deps",))
+    assert bool(comp.matches(token)) is expected
+
+
+def test_any_of_threat_applies_to_either_component() -> None:
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties(("element_ids", "Legacy ids", (), tuple))
+    tm.Threat("T1", requirements=["element_ids.DFD1 | element_ids.DFD2"])
+    a = tm.Component(name="A", element_ids=("DFD1",))
+    b = tm.Component(name="B", element_ids=("DFD2",))
+    c = tm.Component(name="C", element_ids=("DFD3",))
+    scenario = Scenario(name="S")
+    scenario.Dataflow(name="A to B", source=a, sink=b)
+    scenario.Dataflow(name="B to C", source=b, sink=c)
+    report = tm.Report([scenario]).generate()
+    targets = sorted(f["target"] for f in report["scenarios"][0]["findings"])
+    assert targets == ["A", "B"]
+    assert _token_props("element_ids.DFD1 | !other") == ["element_ids", "other"]
+
+
+# -- Threats that name their components
+
+
+@pytest.fixture()
+def nested() -> Ratm:
+    """A component inside an inner boundary inside an outer boundary, plus a component
+    outside both."""
+    tm = Ratm(load_capec_info=False)
+    tm.define_properties("reads_input")
+    outer = tm.Boundary(name="Outer")
+    inner = tm.Boundary(name="Inner", boundary=outer)
+    tm.Component(name="Deep", boundary=inner)
+    tm.Component(name="Shallow", boundary=outer)
+    tm.Component(name="Elsewhere", reads_input=True)
+    return tm
+
+
+def findings_for(tm: Ratm, threat_id: str) -> list[str]:
+    scenario = Scenario(name="S")
+    comps = tm.components
+    scenario.Dataflow(name="f1", source=comps["Deep"], sink=comps["Shallow"])
+    scenario.Dataflow(name="f2", source=comps["Shallow"], sink=comps["Elsewhere"])
+    report = tm.Report([scenario]).generate()
+    return sorted(
+        f["target"]
+        for f in report["scenarios"][0]["findings"]
+        if f["threat_id"] == threat_id
+    )
+
+
+def test_threat_applies_to_listed_component(nested: Ratm) -> None:
+    nested.Threat("T1", components=["Shallow"])
+    assert findings_for(nested, "T1") == ["Shallow"]
+
+
+def test_listed_boundary_covers_nested_components(nested: Ratm) -> None:
+    nested.Threat("T-OUTER", components=["Outer"])
+    nested.Threat("T-INNER", components=["Inner"])
+    assert findings_for(nested, "T-OUTER") == ["Deep", "Shallow"]
+    assert findings_for(nested, "T-INNER") == ["Deep"]
+
+
+def test_listed_components_and_requirements_combine(nested: Ratm) -> None:
+    nested.Threat("T1", requirements=["reads_input"], components=["Deep"])
+    assert findings_for(nested, "T1") == ["Deep", "Elsewhere"]
+
+
+def test_report_rejects_unknown_component_name(nested: Ratm) -> None:
+    nested.Threat("T1", components=["Nowhere"])
+    with pytest.raises(ValueError, match="T1.*component.*Nowhere"):
+        findings_for(nested, "T1")
+
+
+def test_report_rejects_threat_with_nothing_to_match(nested: Ratm) -> None:
+    nested.Threat("T1")
+    with pytest.raises(ValueError, match="T1.*neither requirements nor components"):
+        findings_for(nested, "T1")
+
+
+def test_bare_report_accepts_boundary_names(nested: Ratm) -> None:
+    """Without registered components, names come from the scenario and its boundaries."""
+    threat = Threat("T1", components=["Outer"])
+    scenario = Scenario(name="S")
+    scenario.Dataflow(
+        name="f", source=nested.components["Deep"], sink=nested.components["Elsewhere"]
+    )
+    report = Report([scenario], threats=[threat]).generate()
+    assert [f["target"] for f in report["scenarios"][0]["findings"]] == ["Deep"]
+
+
+# -- Tags
+
+
+def test_tags_are_emitted(tm: Ratm) -> None:
+    old = tm.Boundary(name="Old area", tags=["Legacy"])
+    a = tm.Component(name="A", boundary=old, reads_input=True, tags=["Legacy"])
+    who = tm.Actor(name="Who")
+    scenario = Scenario(name="S1", tags=["Legacy"])
+    scenario.Dataflow(name="Who to A", source=who, sink=a)
+    tm.Mitigation("M-OLD", title="Old control", tags=["Legacy"])
+    tm.Threat("T1", requirements=["reads_input"], tags=["Legacy"])
+    report = tm.Report([scenario]).generate()
+    assert report["components"]["A"]["tags"] == ["Legacy"]
+    assert report["components"]["Old area"]["tags"] == ["Legacy"]
+    assert report["components"]["Who"]["tags"] == []
+    assert report["scenarios"][0]["tags"] == ["Legacy"]
+    assert report["mitigations"]["M-OLD"]["tags"] == ["Legacy"]
+    assert report["threats"][0]["tags"] == ["Legacy"]
+
+
+def test_report_rejects_a_string_as_tags(tm: Ratm) -> None:
+    # A bare string would otherwise become one tag per character.
+    tm.Threat("T1", requirements=["reads_input"], tags="Legacy")
+    with pytest.raises(ValueError, match="T1.*tags"):
+        tm.Report([make_scenario(tm)]).generate()
+
+
+def test_scenario_without_description_loads_on_the_site(tm: Ratm) -> None:
+    tm.Threat("T1", requirements=["reads_input"])
+    report = tm.Report([make_scenario(tm)]).generate()
+    assert report["scenarios"][0]["description"] == ""
+    ThreatModel.model_validate(json.loads(json.dumps(report)))

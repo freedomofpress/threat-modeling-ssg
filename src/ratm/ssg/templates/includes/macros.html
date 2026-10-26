@@ -4,12 +4,17 @@
 
 {% macro mitigation_status(mitigation) -%}
 <span class="status-badge status--{{ mitigation.status }}">{{ mitigation.status }}</span>
+{%- if mitigation.has_test %} <span class="status-badge status--test" title="{{ mitigation.tests | map(attribute='name') | join(', ') }}">has automated test</span>{% endif %}
+{%- endmacro %}
 
+{# Tags such as "Legacy", each as a small badge after a name. #}
+{% macro tag_badges(tags) -%}
+{% for tag in tags or [] %} <span class="item-tag">{{ tag }}</span>{% endfor %}
 {%- endmacro %}
 
 {# A mitigation named by its title, with its id alongside for reference. #}
 {% macro mitigation_link(mitigation) -%}
-<a href="{{ mitigation.id | mitigation_href }}">{{ mitigation.title or mitigation.id }}</a> <span class="ref-id">{{ mitigation.id }}</span>
+<a href="{{ mitigation.id | mitigation_href }}">{{ mitigation.title or mitigation.id }}</a> <span class="ref-id">{{ mitigation.id }}</span>{{ tag_badges(mitigation.tags) }}
 {%- endmacro %}
 
 {# Mitigations as a comma-separated list of titles, for table cells. #}
@@ -23,7 +28,7 @@
 
 {# A threat named by its title, with its id alongside for reference. #}
 {% macro threat_link(tid, threat) -%}
-<a href="threat_{{ tid }}.html">{{ threat.description if threat and threat.description else tid }}</a> <span class="ref-id">{{ tid }}</span>
+<a href="threat_{{ tid }}.html">{{ threat.description if threat and threat.description else tid }}</a> <span class="ref-id">{{ tid }}</span>{% if threat %}{{ tag_badges(threat.tags) }}{% endif %}
 {%- endmacro %}
 
 {# A risk score with its band, e.g. "9 high", or "Unknown" when a label is missing. #}

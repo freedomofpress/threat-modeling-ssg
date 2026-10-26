@@ -34,6 +34,8 @@ class ThreatMapping(BaseModel):
     # Mitigation ids. Look them up in ThreatModel.mitigations.
     mitigations: list[str] = []
     further_mitigations: list[str] = []
+    # Components and boundaries the threat is listed for, by name.
+    components: list[str] = []
 
     @property
     def requirement_props(self) -> set[str]:
@@ -44,12 +46,37 @@ class ThreatMapping(BaseModel):
         return [k for k in self.requirements if base_prop in _token_props(k)]
 
 
+class TestRef(BaseModel):
+    """An automated test that checks a mitigation, in some code repository."""
+
+    # Not a pytest test class, despite the name.
+    __test__ = False
+
+    repo: str
+    path: str
+    name: str
+    line: int | None = None
+    url: str | None = None
+
+
 class Mitigation(BaseModel):
     id: str
     title: str = ""
     description: str = ""
     status: str = scales.DEFAULT_MITIGATION_STATUS
+    verification: str | None = None
+    tests: list[TestRef] = []
     source: SourceRef | None = None
+    tags: list[str] = []
+
+    @property
+    def has_test(self) -> bool:
+        return bool(self.tests)
+
+    @property
+    def counts_for_coverage(self) -> bool:
+        """True for the mitigations the test coverage page measures."""
+        return self.status == "implemented" and self.verification == "test"
 
 
 class ThreatActor(BaseModel):
@@ -74,6 +101,7 @@ class Threat(BaseModel):
     children: list[str] = []
     mapping: ThreatMapping = Field(default_factory=ThreatMapping)
     source: SourceRef | None = None
+    tags: list[str] = []
 
     @property
     def impact_label(self) -> str:
@@ -108,14 +136,6 @@ class Threat(BaseModel):
         )
 
     @property
-    def risk_band(self) -> str | None:
-        return scales.risk_band(self.risk_score)
-
-    @property
-    def residual_risk_band(self) -> str | None:
-        return scales.risk_band(self.residual_risk_score)
-
-    @property
     def is_open(self) -> bool:
         """True while the threat still needs work (see scales.OPEN_STATUSES)."""
         return self.status in scales.OPEN_STATUSES
@@ -142,12 +162,6 @@ class Threat(BaseModel):
     def is_capec(self) -> bool:
         return self.SID.startswith("CAPEC-")
 
-    def applies_to(self, component: "Component") -> bool:
-        """True if the component has all the requirement properties for this threat."""
-        return bool(self.mapping.requirements) and all(
-            _token_satisfied(component, tok) for tok in self.mapping.requirements
-        )
-
 
 class Component(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -157,6 +171,7 @@ class Component(BaseModel):
     inBoundary: str | None = Field(alias="in_boundary", default=None)
     properties: dict[str, Any] = {}
     source: SourceRef | None = None
+    tags: list[str] = []
     _key: str | None = PrivateAttr(default=None)
 
     def get_property(self, name):
@@ -188,6 +203,7 @@ class Scenario(BaseModel):
     dfd: str = ""
     mermaid: str = ""
     url: str | None = None
+    tags: list[str] = []
 
     @property
     def source(self) -> SourceRef | None:
@@ -207,7 +223,10 @@ class Property(BaseModel):
 
 
 def _token_props(token: str) -> list[str]:
-    """The property names a requirement/mitigation token refers to."""
+    """The property names that one requirement refers to."""
+    if "|" in token:
+        names = [name for part in token.split("|") for name in _token_props(part)]
+        return list(dict.fromkeys(names))
     token = token.strip()
     for operator in ("!=", "=="):
         if operator in token:
@@ -216,25 +235,16 @@ def _token_props(token: str) -> list[str]:
     return [token.removeprefix("!").split(".", 1)[0]]
 
 
-def _token_satisfied(component: Component, token: str) -> bool:
-    """Check if a single requirement/mitigation token is satisfied by the component.
+def _shared_tags(tag_lists: Iterable[list[str]]) -> list[str]:
+    """The tags present in every list, in the first list's order, or [] if none."""
+    tag_lists = list(tag_lists)
+    if not tag_lists:
+        return []
+    return [tag for tag in tag_lists[0] if all(tag in tags for tags in tag_lists)]
 
-    Mirrors ComponentProperties.matches() on the report side: negation ('!is_exposed'),
-    comparison ('requires_credentials != uses_strong_credentials'), sub-resources
-    ('verifies_resources.deps') and plain truthiness ('is_physical')."""
-    token = token.strip()
-    if token.startswith("!"):
-        return not _token_satisfied(component, token[1:])
-    for operator in ("!=", "=="):
-        if operator in token:
-            left, right = (part.strip() for part in token.split(operator, 1))
-            equal = component.properties.get(left) == component.properties.get(right)
-            return not equal if operator == "!=" else equal
-    if "." in token:
-        prop, item = token.split(".", 1)
-        value = component.properties.get(prop)
-        return item in value if isinstance(value, list) else bool(value)
-    return bool(component.properties.get(token))
+
+def _merge_tags(own: list[str], extra: list[str]) -> list[str]:
+    return [*own, *(tag for tag in extra if tag not in own)]
 
 
 def source_url(config: SiteConfig, source: SourceRef | None) -> str | None:
@@ -291,6 +301,59 @@ class ThreatModel(BaseModel):
             scenario.dfd = generate_dataflow(scenario, self.components)
             scenario.mermaid = generate_sequence(scenario)
 
+    def prepare_site(self, config: SiteConfig) -> None:
+        """Get the model ready to render by building the diagrams and resolving tags."""
+        self.prepare_scenarios(config)
+        self.resolve_tags()
+
+    def resolve_tags(self) -> None:
+        """Add inherited tags to threats and mitigations.
+
+        A threat gets the tags shared by every component it is found on, and a
+        mitigation gets the tags shared by every threat that lists it. An item found on
+        nothing, or listed by no threat, keeps only its own tags.
+        """
+        found_on = self.analyze()["threats_to_components"]
+        for tid, threat in self.threats.items():
+            components = [self.components.get(name) for name in found_on.get(tid, ())]
+            shared = _shared_tags(comp.tags if comp else [] for comp in components)
+            threat.tags = _merge_tags(threat.tags, shared)
+        for mid, mitigation in self.mitigations.items():
+            listing = [
+                threat
+                for threat in self.threats.values()
+                if mid in threat.mapping.mitigations
+                or mid in threat.mapping.further_mitigations
+            ]
+            shared = _shared_tags(threat.tags for threat in listing)
+            mitigation.tags = _merge_tags(mitigation.tags, shared)
+
+    def enclosing_names(self, name: str) -> list[str]:
+        """The component's name, then each boundary around it, innermost first."""
+        names, current = [], name
+        while current and current not in names:
+            names.append(current)
+            component = self.components.get(current)
+            current = component.inBoundary if component else None
+        return names
+
+    def listed_threats(self, name: str) -> list[tuple[str, Threat]]:
+        """Threats that list this component or a boundary around it, in risk order."""
+        around = set(self.enclosing_names(name))
+        return self.threats_by_risk(
+            tid
+            for tid, threat in self.threats.items()
+            if around & set(threat.mapping.components)
+        )
+
+    def component_tags(self, name: str) -> list[str]:
+        component = self.components.get(name)
+        return component.tags if component else []
+
+    def scenario_tags(self, name: str) -> list[str]:
+        scenario = self.scenario_by_name().get(name)
+        return scenario.tags if scenario else []
+
     def scenario_by_name(self) -> dict[str, Scenario]:
         if self._scenario_by_name is None:
             self._scenario_by_name = {s.name: s for s in self.scenarios}
@@ -320,13 +383,6 @@ class ThreatModel(BaseModel):
                     if scenario.name not in threats_to_scenarios[tid]:
                         threats_to_scenarios[tid].append(scenario.name)
 
-        active = [self.threats[tid] for tid in threat_counter if tid in self.threats]
-        impact_counter = Counter(t.impact_label for t in active)
-        impact_distribution = {
-            label: impact_counter[label]
-            for label in scales.IMPACT_ORDER
-            if impact_counter[label]
-        }
         # Count every defined threat, so each count matches the register filtered to
         # that status.
         status_counter = Counter(t.status for t in self.threats.values())
@@ -345,12 +401,10 @@ class ThreatModel(BaseModel):
 
         self._analysis = {
             "threat_counter": threat_counter,
-            "threats_by_frequency": threat_counter.most_common(),
             "threats_to_components": dict(threats_to_components),
             "threats_to_scenarios": dict(threats_to_scenarios),
             "components_to_threats": dict(components_to_threats),
             "components_to_scenarios": dict(components_to_scenarios),
-            "impact_distribution": impact_distribution,
             "status_distribution": status_distribution,
             "actors_to_threats": dict(actors_to_threats),
         }
@@ -443,6 +497,45 @@ class ThreatModel(BaseModel):
             )
         )
         return rows
+
+    def test_coverage(self) -> dict[str, Any]:
+        """How many implemented mitigations are verified by tests.
+
+        `counted` lists those mitigations, the ones without tests first. A mitigation is
+        covered when at least one test reference names it. `methods` counts the other
+        implemented mitigations by verification method, so the page can say what the
+        ratio leaves out, and `not_counted` lists mitigations that have tests but are
+        not measured.
+        """
+        implemented = [
+            m for m in self.mitigations.values() if m.status == "implemented"
+        ]
+        counted = sorted(
+            (m for m in implemented if m.counts_for_coverage),
+            key=lambda m: (bool(m.tests), scales.natural_key(m.id)),
+        )
+        covered = sum(bool(m.tests) for m in counted)
+        by_method = Counter(m.verification for m in implemented)
+        return {
+            "counted": counted,
+            "covered": covered,
+            "ratio": covered / len(counted) if counted else None,
+            "implemented": len(implemented),
+            "methods": {
+                method: by_method[method]
+                for method in scales.VERIFICATION_METHODS
+                if method != "test" and by_method[method]
+            },
+            "unclassified": by_method[None],
+            "not_counted": sorted(
+                (
+                    m
+                    for m in self.mitigations.values()
+                    if m.tests and not m.counts_for_coverage
+                ),
+                key=lambda m: scales.natural_key(m.id),
+            ),
+        }
 
     def parent_threats(self, threat_id: str) -> list[str]:
         """Return the ids of the threats that list threat_id as a child."""

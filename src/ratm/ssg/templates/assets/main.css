@@ -264,6 +264,8 @@ nav {
     a {
         margin-right: 15px;
         font-weight: 500;
+        /* Keep two-word labels such as "Threat Actors" in one pill. */
+        white-space: nowrap;
         padding: 6px 12px;
         border-radius: 4px;
         background-color: var(--color-bg-header);
@@ -606,6 +608,8 @@ th.prop-col .cell-tip {
     .node rect { fill: var(--color-bg-header); stroke: var(--color-text-dim); }
     .node text { fill: var(--color-text); }
 
+    .node.tagged text { fill: var(--color-text-dim); }
+
     .node.highlighted ellipse,
     .node.highlighted polygon,
     .node.highlighted rect { fill: #c0392b; stroke: #c0392b; }
@@ -697,6 +701,13 @@ tbody tr:hover {
 .tag--text {
     background-color: var(--color-bg-header);
     color: var(--color-text-dim);
+}
+
+/* A requirement naming several properties links each one inside its tag. */
+.tag a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 .click-zoom {
@@ -981,6 +992,14 @@ svg a {
     border-style: dashed;
 }
 
+/* The badge naming a mitigation's test. It isn't a status, so it is drawn
+   as a plain outline in the text color and never looks like a warning. */
+.status-badge.status--test {
+    background-color: transparent;
+    color: var(--color-text);
+    border: 1px solid currentColor;
+}
+
 .count-box[class*="status--"] .count-box__value,
 .count-box[class*="status--"] .count-box__label,
 .count-box[class*="status--"] .count-box__note {
@@ -1012,6 +1031,23 @@ td.prop-cell[class*="status--"] {
 }
 
 /* A threat or mitigation named by its title, with the id alongside. */
+/* A tag such as "Legacy" after a name. A muted pill, so it never reads as a
+   status badge. */
+.item-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 7px;
+    border: 1px solid var(--color-text-dim);
+    border-radius: 999px;
+    color: var(--color-text-dim);
+    font-size: 0.75rem;
+    font-weight: normal;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
 .ref-id {
     font-family: 'Share Tech Mono', monospace;
     font-size: 0.8em;
