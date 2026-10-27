@@ -9,9 +9,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+from click.testing import CliRunner
+
 from ratm import Ratm
 from ratm.components import CAPECInfo, Scenario
-from ratm.ssg.cli import build_env
+from ratm.ssg.cli import build_env, main
 from ratm.ssg.models import SiteConfig, ThreatModel
 from ratm.ssg.utils import render_views
 
@@ -96,21 +99,29 @@ def build_demo_site(out: Path, hash_seed: int) -> None:
             filter(None, [str(ROOT / "src"), os.environ.get("PYTHONPATH")])
         ),
     }
-    # ratm loads config.toml from the current directory. Run from `out` so a config.toml
-    # wherever the tests run cannot change the build.
+    # Pass an empty config explicitly, so a config.toml wherever the tests run cannot
+    # change the build.
+    config = out.parent / "config.toml"
+    config.touch()
     report = subprocess.run(
         [sys.executable, str(DEMO)],
         env=env,
-        cwd=out,
         capture_output=True,
         text=True,
         check=True,
     ).stdout
     subprocess.run(
-        [sys.executable, "-c", "from ratm.ssg.cli import main; main()", "-o", "."],
+        [
+            sys.executable,
+            "-c",
+            "from ratm.ssg.cli import main; main()",
+            "-o",
+            str(out),
+            "-c",
+            str(config),
+        ],
         input=report,
         env=env,
-        cwd=out,
         capture_output=True,
         text=True,
         check=True,
@@ -176,3 +187,35 @@ def test_scenario_names_with_punctuation_get_portable_page_names(
         "threat_T1.html",
     ):
         assert link in (tmp_path / linking).read_text(), linking
+
+
+def test_config_option_chooses_the_config_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report = json.dumps(author_model())
+    (tmp_path / "config.toml").write_text('title = "From the current directory"')
+    other = tmp_path / "other.toml"
+    other.write_text('title = "From --config"')
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(main, ["-o", "default"], input=report)
+    assert result.exit_code == 0, result.output
+    assert "From the current directory" in (tmp_path / "default/index.html").read_text()
+
+    result = runner.invoke(main, ["-o", "chosen", "-c", str(other)], input=report)
+    assert result.exit_code == 0, result.output
+    page = (tmp_path / "chosen/index.html").read_text()
+    assert "From --config" in page
+    assert "From the current directory" not in page
+
+
+def test_config_option_rejects_a_missing_file(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        main,
+        ["-o", str(tmp_path / "out"), "-c", str(tmp_path / "missing.toml")],
+        input=json.dumps(author_model()),
+    )
+    assert result.exit_code != 0
+    assert "missing.toml" in result.output
+    assert not (tmp_path / "out").exists()

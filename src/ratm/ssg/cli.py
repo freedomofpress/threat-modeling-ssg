@@ -13,13 +13,18 @@ from .utils import display_token, property_href, render_views, slugify
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
-def load_config(filename="config.toml"):
-    config_path = Path(filename)
-    if config_path.exists():
-        print("Loading config.toml...")
-        with open(config_path, "rb") as f:
-            return SiteConfig.model_validate(tomllib.load(f))
-    return SiteConfig()
+DEFAULT_CONFIG = Path("config.toml")
+
+
+def load_config(config_path: Path | None = None) -> SiteConfig:
+    # Without --config, config.toml in the current directory is optional.
+    if config_path is None:
+        if not DEFAULT_CONFIG.exists():
+            return SiteConfig()
+        config_path = DEFAULT_CONFIG
+    print(f"Loading {config_path}...")
+    with open(config_path, "rb") as f:
+        return SiteConfig.model_validate(tomllib.load(f))
 
 
 def copy_assets(assets_dst):
@@ -63,8 +68,16 @@ def build_env() -> Environment:
     show_default=True,
     help="Output directory for the generated files",
 )
-def main(output_dir):
-    config = load_config()
+@click.option(
+    "-c",
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Site config file. Defaults to config.toml in the current directory, if present.",
+)
+def main(output_dir, config_path):
+    config = load_config(config_path)
 
     model = ThreatModel.load_report(sys.stdin)
 
