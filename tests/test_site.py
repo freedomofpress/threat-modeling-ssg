@@ -9,8 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from ratm import Ratm
 from ratm.components import CAPECInfo, Scenario
 from ratm.ssg.cli import build_env
@@ -129,7 +127,6 @@ def differing_files(a: Path, b: Path) -> list[str]:
     return differ
 
 
-@pytest.mark.skipif(not DEMO.exists(), reason="demo model missing")
 def test_builds_are_reproducible(tmp_path: Path) -> None:
     # Python randomizes string hashing in each process, and that decides the order in
     # which a set of strings is iterated. Two builds in this process would always match,
