@@ -1,9 +1,8 @@
-{# Sorting and filtering for tables marked data-sortable, and filter forms marked
-   data-filter-for="<table id>". Rows carry their sort values as data-sort-<key>
-   numbers and their filter values as data-<name> ("|"-separated lists), so the
-   visible text never has to be parsed. Without JavaScript every table still
-   renders complete, in the order the server chose. #}
-<script>
+// Sorting and filtering for tables marked data-sortable, and filter forms marked
+// data-filter-for="<table id>". Rows carry their sort values as data-sort-<key>
+// numbers and their filter values as data-<name> ("|"-separated lists), so the
+// visible text never has to be parsed. Without JavaScript every table still
+// renders complete, in the order the server chose.
 (function () {
     function rowsOf(table) {
         return Array.prototype.slice.call(table.tBodies[0].rows);
@@ -77,4 +76,3 @@
         apply();
     });
 })();
-</script>

@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from ratm import Ratm, Scenario
-from ratm.ssg.cli import build_env
+from ratm.ssg.cli import TEMPLATES_DIR, build_env
 from ratm.ssg.models import SiteConfig, ThreatModel
 from ratm.ssg.utils import render_views
 
@@ -158,6 +158,15 @@ def test_register_lists_threats_in_risk_order(tmp_path: Path) -> None:
     # Filter values for the status select, including the open group.
     assert 'data-status="partially mitigated|open"' in page
     assert '<option value="open">' in page
+
+
+def test_sortable_pages_load_the_table_script(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    script = '<script src="assets/table-tools.js"></script>'
+    for name in ("threats.html", "mitigations.html"):
+        assert script in (tmp_path / name).read_text(), name
+    # ratm copies this directory into the site's assets.
+    assert (TEMPLATES_DIR / "assets" / "table-tools.js").is_file()
 
 
 def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
