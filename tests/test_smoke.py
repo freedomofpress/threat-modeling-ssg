@@ -265,6 +265,21 @@ def test_coverage_page_with_nothing_to_measure(tmp_path: Path) -> None:
     ) in page
 
 
+def test_coverage_is_left_out_when_no_mitigation_records_verification(
+    tmp_path: Path,
+) -> None:
+    report = author_model()
+    for mitigation in report["mitigations"].values():
+        mitigation["verification"] = None
+        mitigation["tests"] = []
+    render(report, tmp_path)
+    assert not (tmp_path / "coverage.html").exists()
+    for page_path in tmp_path.glob("*.html"):
+        assert 'href="coverage.html"' not in page_path.read_text(), page_path.name
+    guide = (tmp_path / "guide.html").read_text()
+    assert 'id="verification"' not in guide and "has automated test" not in guide
+
+
 def test_summary_leads_with_open_risk(tmp_path: Path) -> None:
     render(author_model(), tmp_path)
     index = (tmp_path / "index.html").read_text()

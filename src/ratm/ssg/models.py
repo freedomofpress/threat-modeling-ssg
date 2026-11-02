@@ -526,6 +526,12 @@ class ThreatModel(BaseModel):
         )
         return rows
 
+    @property
+    def tracks_verification(self) -> bool:
+        """True when any mitigation records a verification method or tests. Without
+        one, the site leaves out the test coverage page and its explanations."""
+        return any(m.verification or m.tests for m in self.mitigations.values())
+
     def test_coverage(self) -> dict[str, Any]:
         """How many implemented mitigations are verified by tests.
 

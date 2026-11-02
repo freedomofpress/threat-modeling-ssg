@@ -86,7 +86,7 @@ Generating the report fails with an error naming the problem when:
 - **Summary**: counts by status, each linking to the matching threats, and the ten highest open risks.
 - **Threats**: the risk register. Every threat, highest risk after mitigations first, with sorting and filters by status, threat actor, and text. Filters can be preset in the link, for example `threats.html?status=open`.
 - **Backlog**: proposed mitigations, ranked by the risk they would reduce.
-- **Test Coverage**: implemented mitigations verified by test, which of them have at least one test, and the ratio. It also says how many implemented mitigations are verified some other way or not classified yet, and lists mitigations that have tests but are not counted. Mitigation pages list their tests.
+- **Test Coverage**: implemented mitigations verified by test, which of them have at least one test, and the ratio. It also says how many implemented mitigations are verified some other way or not classified yet, and lists mitigations that have tests but are not counted. Mitigation pages list their tests. The page appears once any mitigation records a `verification` or `tests`.
 - **Scenarios**, **Mitigations**, **Threat Actors**, and **Components**, each listing threats highest risk first.
 - **How to read this model** explains the statuses and scores.
 - **Model internals** holds the views for people writing the model: the matching rules, the threats × components matrix, and the component properties.

@@ -279,6 +279,7 @@ def property_view(
         slug = slugify(prop_key)
         yield {
             "config": config,
+            "model": model,
             "prop": prop_key,
             "prop_slug": slug,
             "data": {
@@ -435,31 +436,42 @@ def backlog_view(
     return {"config": config, "model": model, "rows": model.backlog()}
 
 
-@view("/coverage.html", log="Generating coverage.html...")
+@view(
+    "/coverage.html",
+    log=lambda count: (
+        "Generating coverage.html..."
+        if count
+        else "Skipping coverage.html: no mitigation records verification or tests."
+    ),
+)
 def coverage_view(
     config: SiteConfig,
     model: ThreatModel,
-) -> dict[str, Any]:
+) -> list[dict[str, Any]]:
     """Which implemented mitigations are verified by tests."""
+    if not model.tracks_verification:
+        return []
     coverage = model.test_coverage()
     uncounted = [
         f"{n} verified by {method}" for method, n in coverage["methods"].items()
     ]
     if coverage["unclassified"]:
         uncounted.append(f"{coverage['unclassified']} with no verification method yet")
-    return {
-        "config": config,
-        "model": model,
-        "coverage": coverage,
-        "id_rank": {
-            mid: rank
-            for rank, mid in enumerate(
-                sorted((m.id for m in coverage["counted"]), key=scales.natural_key)
-            )
-        },
-        # The implemented mitigations left out of the ratio, as phrases.
-        "uncounted": uncounted,
-    }
+    return [
+        {
+            "config": config,
+            "model": model,
+            "coverage": coverage,
+            "id_rank": {
+                mid: rank
+                for rank, mid in enumerate(
+                    sorted((m.id for m in coverage["counted"]), key=scales.natural_key)
+                )
+            },
+            # The implemented mitigations left out of the ratio, as phrases.
+            "uncounted": uncounted,
+        }
+    ]
 
 
 @view(
