@@ -46,6 +46,22 @@ Risk is impact times likelihood, from 1 to 12: 1–3 is low, 4–6 medium, and 8
 
 **Mitigations** (`tm.Mitigation(id, title=..., ...)`) have a `description` and a `status` (`implemented`, `optional`, or `proposed`). When a control is a component property, put it in the threat's requirements instead, for example `!encrypts_secrets`, so the threat applies only to components without it.
 
+**Threat actors** (`tm.ThreatActor(name, description=...)`) must be registered before a threat can name them.
+
+**Tags** are labels you choose for parts of the model. Components, actors, boundaries, scenarios, threats, and mitigations take a `tags` list of any non-empty strings, for example `tags=["Legacy"]` for the pieces of an older setup kept for comparison, or `tags=["Third party"]` as in the demo. The site shows each tag as a badge next to the item's name and draws tagged components dashed in the diagrams. A threat also gets the tags shared by every component it is found on, and a mitigation gets the tags shared by every threat that lists it. Tags are labels only. They do not change which threats apply or how risk is counted.
+
+Generating the report fails with an error naming the problem when:
+
+- a threat names an unknown component, mitigation, threat actor, or child threat, lists itself as a child, or has neither components nor requirements
+- a status is not one of the values above
+- an impact or likelihood is given but is not on its scale
+- two threats, mitigations, or threat actors share an id or name
+- `tags` is not a list of non-empty strings
+- a `verification` is not one of the values above
+- a test reference has an empty `repo`, `path`, or `name`, a `line` that is not a positive integer, or a `url` that is not an `http://` or `https://` URL
+
+## Verification and tests
+
 A mitigation's `verification` says how it is shown to work: `test`, `inspection`, `analysis`, or `demonstration`. Leave it unset until someone has classified the mitigation. `tests` lists the automated tests that check it, as `TestRef(repo=..., path=..., name=..., line=..., url=...)` objects or dicts with the same keys (`line` and `url` are optional):
 
 ```python
@@ -67,19 +83,7 @@ tm.Mitigation(
 
 ratm does not look for tests itself. The model script passes in what a scan of the code repositories found, either when it registers a mitigation or later, through `tm.mitigations[id].tests`. ratm counts every reference it is given, so leave out tests that are skipped or expected to fail.
 
-**Threat actors** (`tm.ThreatActor(name, description=...)`) must be registered before a threat can name them.
-
-**Tags** label parts of the model, for example the pieces of an older setup that is kept for comparison. Components, actors, boundaries, scenarios, threats, and mitigations take `tags=["Legacy"]`. The site shows each tag as a badge next to the item's name and draws tagged components dashed in the diagrams. A threat also gets the tags shared by every component it is found on, and a mitigation gets the tags shared by every threat that lists it. Tags are labels only. They do not change which threats apply or how risk is counted.
-
-Generating the report fails with an error naming the problem when:
-
-- a threat names an unknown component, mitigation, threat actor, or child threat, lists itself as a child, or has neither components nor requirements
-- a status is not one of the values above
-- an impact or likelihood is given but is not on its scale
-- two threats, mitigations, or threat actors share an id or name
-- `tags` is not a list of non-empty strings
-- a `verification` is not one of the values above
-- a test reference has an empty `repo`, `path`, or `name`, a `line` that is not a positive integer, or a `url` that is not an `http://` or `https://` URL
+Both fields are optional. The site's **Test Coverage** page measures them, and it is left out when no mitigation sets either one.
 
 ## The generated site
 
