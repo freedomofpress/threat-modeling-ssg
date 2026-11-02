@@ -23,7 +23,7 @@ A model is a Python script that uses the `Ratm` builders. `demo/model.py` is a c
 
 **Properties** describe components (`tm.define_properties(...)`). A threat's `requirements` are expressions over them: `prop`, `!prop`, `prop.item`, `a == b`, `a != b`, and `x | y` when any of several alternatives will do, for example `element_ids.DFD1 | element_ids.DFD2`.
 
-A threat applies to the components it names in `components`, and to every component that meets all of its `requirements`. Naming a boundary covers every component inside it, at any depth. A threat needs at least one of the two.
+A threat applies to the components it names in `components`, whether or not they meet its `requirements`, and to every component that meets all of its `requirements`. Naming a boundary covers every component inside it, at any depth. A threat needs at least one of the two.
 
 **Threats** (`tm.Threat(id, components=[...], requirements=[...], ...)`):
 

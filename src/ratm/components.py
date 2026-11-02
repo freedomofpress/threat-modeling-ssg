@@ -473,8 +473,8 @@ class Threat:
 
     def matches(self, component: Component):
         """True if the component is listed (directly or through a boundary around it) or
-        meets every requirement."""
-        if self.components and set(component.enclosing_names) & set(self.components):
+        meets every requirement. A listed component matches regardless of its properties."""
+        if self.components and (set(component.enclosing_names) & set(self.components)):
             return True
         if not self.requirements:
             return False
