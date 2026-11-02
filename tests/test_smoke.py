@@ -10,8 +10,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from ratm import Ratm, Scenario
 from ratm.ssg.cli import build_env
 from ratm.ssg.models import SiteConfig, ThreatModel
@@ -190,6 +188,11 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
         for needle in ("&amp;amp;", "&amp;#34;", "&lt;span", "&lt;a "):
             assert needle not in page, (page_path.name, needle)
 
+    # The components table marks properties with the characters ✓ and ✗. Written as
+    # &#x2713; entities, they would be escaped and shown as literal text.
+    components = (tmp_path / "components.html").read_text()
+    assert ">✓</td>" in components and ">✗</td>" in components
+
     # In the page, the diagram source is escaped. Decoding it must give back exactly the
     # DOT and Mermaid text, since that is what diagrams.js passes to Viz and Mermaid.
     scenario = model.scenarios[0]
@@ -204,7 +207,6 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
         assert any("label = <<i>Net</i>>;" in s for s in sources), name
 
 
-@pytest.mark.skipif(not DEMO.exists(), reason="demo model missing")
 def test_demo_round_trip(tmp_path: Path) -> None:
     namespace = runpy.run_path(str(DEMO), run_name="demo")
     tm = namespace["tm"]
