@@ -364,6 +364,34 @@ class ThreatModel(BaseModel):
         pairs = [(tid, self.threats[tid]) for tid in ids if tid in self.threats]
         return sorted(pairs, key=lambda item: item[1].risk_order)
 
+    def register(self) -> list[dict[str, Any]]:
+        """The risk register: every threat in risk order, highest risk first, with the
+        components it is found on in a scenario."""
+        components = self.analyze()["threats_to_components"]
+        return [
+            {
+                "tid": tid,
+                "threat": threat,
+                "components": sorted(
+                    components.get(tid, set()), key=scales.natural_key
+                ),
+            }
+            for tid, threat in self.threats_by_risk()
+        ]
+
+    def top_open_risks(self, limit: int = 10) -> list[dict[str, Any]]:
+        """The open threats with the highest risk, highest first, as register rows.
+
+        Only threats found on at least one component in a scenario count.
+        """
+        found = self.analyze()["threat_counter"]
+        rows = [
+            row
+            for row in self.register()
+            if row["threat"].is_open and row["tid"] in found
+        ]
+        return rows[:limit]
+
     def threat_mitigations(
         self, threat: Threat, further: bool = False
     ) -> list[Mitigation]:

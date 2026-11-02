@@ -13,26 +13,11 @@ def summary_view(
     config: SiteConfig,
     model: ThreatModel,
 ) -> dict[str, Any]:
-    analysis = model.analyze()
-    # The highest residual risks that still need work and apply to at least one
-    # component in a scenario.
-    top_open = [
-        {
-            "tid": tid,
-            "threat": threat,
-            "components": sorted(
-                analysis["threats_to_components"].get(tid, set()),
-                key=scales.natural_key,
-            ),
-        }
-        for tid, threat in model.threats_by_risk()
-        if threat.is_open and tid in analysis["threat_counter"]
-    ][:10]
     return {
         "config": config,
         "model": model,
-        "analysis": analysis,
-        "top_open": top_open,
+        "analysis": model.analyze(),
+        "top_open": model.top_open_risks(),
         "open_count": sum(t.is_open for t in model.threats.values()),
     }
 
@@ -43,13 +28,6 @@ def threats_view(
     model: ThreatModel,
 ) -> dict[str, Any]:
     """The risk register: every threat in risk order, sortable and filterable."""
-    analysis = model.analyze()
-    rows = []
-    for tid, threat in model.threats_by_risk():
-        components = sorted(
-            analysis["threats_to_components"].get(tid, set()), key=scales.natural_key
-        )
-        rows.append({"tid": tid, "threat": threat, "components": components})
     id_rank = {
         tid: rank
         for rank, tid in enumerate(sorted(model.threats, key=scales.natural_key))
@@ -57,7 +35,7 @@ def threats_view(
     return {
         "config": config,
         "model": model,
-        "rows": rows,
+        "rows": model.register(),
         "id_rank": id_rank,
         "status_rank": {s: i for i, s in enumerate(scales.THREAT_STATUSES)},
         "impact_scores": scales.IMPACT_SCORES,

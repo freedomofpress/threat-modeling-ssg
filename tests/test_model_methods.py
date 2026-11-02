@@ -472,3 +472,61 @@ def test_open_risk_summary() -> None:
         "top_risk": 6,
     }
     assert model.open_risk(["T3"]) == {"total": 1, "open": 0, "top_risk": None}
+
+
+def _register_model(model_factory, threats):
+    return model_factory(
+        threats=threats,
+        components={
+            name: Component(name=name, component_class="Process")
+            for name in ("B2", "B10")
+        },
+        scenarios=[
+            Scenario(
+                name="S1",
+                findings=[
+                    Finding(target=target, threat_id=tid)
+                    for tid in threats
+                    if tid != "T-UNFOUND"
+                    for target in ("B10", "B2")
+                ],
+                flows=[Flow(id="1", name="B2 to B10", source="B2", sink="B10")],
+            )
+        ],
+    )
+
+
+def test_register_lists_every_threat_highest_risk_first(model_factory) -> None:
+    model = _register_model(
+        model_factory,
+        {
+            "T-LOW": Threat(SID="T-LOW", impact="Low", likelihood="Low"),
+            "T-HIGH": Threat(SID="T-HIGH", impact="High", likelihood="High"),
+            "T-UNFOUND": Threat(SID="T-UNFOUND", impact="Medium", likelihood="Low"),
+        },
+    )
+    rows = model.register()
+    assert [row["tid"] for row in rows] == ["T-HIGH", "T-UNFOUND", "T-LOW"]
+    assert rows[0]["threat"] is model.threats["T-HIGH"]
+    # Components sort with their numbers compared, and a threat found nowhere has none.
+    assert rows[0]["components"] == ["B2", "B10"]
+    assert rows[1]["components"] == []
+
+
+def test_top_open_risks_keeps_the_highest_open_found_threats(model_factory) -> None:
+    threats = {
+        f"T{n}": Threat(SID=f"T{n}", impact="Low", likelihood="Low") for n in range(12)
+    }
+    threats["T-TOP"] = Threat(SID="T-TOP", impact="High", likelihood="High")
+    threats["T-ACCEPTED"] = Threat(
+        SID="T-ACCEPTED", status="accepted", impact="High", likelihood="High"
+    )
+    threats["T-UNFOUND"] = Threat(SID="T-UNFOUND", impact="High", likelihood="High")
+    model = _register_model(model_factory, threats)
+
+    top = [row["tid"] for row in model.top_open_risks()]
+    assert len(top) == 10
+    # Highest risk first. Accepted and unfound threats are left out.
+    assert top[0] == "T-TOP"
+    assert "T-ACCEPTED" not in top and "T-UNFOUND" not in top
+    assert [row["tid"] for row in model.top_open_risks(limit=2)] == top[:2]
