@@ -46,9 +46,7 @@
 
         function apply() {
             var shown = 0;
-            // Keep parameters the filters don't own, such as the theme.
-            var query = new URLSearchParams(window.location.search);
-            form.querySelectorAll("[name]").forEach(function (control) { query.delete(control.name); });
+            var query = new URLSearchParams();
             rowsOf(table).forEach(function (row) {
                 var visible = true;
                 form.querySelectorAll("[name]").forEach(function (control) {
