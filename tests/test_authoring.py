@@ -205,8 +205,10 @@ def test_report_validates_mitigation_status(tm: Ratm) -> None:
 
 
 def test_report_validates_duplicate_threat_ids() -> None:
-    threats = [Threat("T1", requirements=["x"]), Threat("T1", requirements=["y"])]
-    with pytest.raises(ValueError, match="T1"):
+    threats = [
+        Threat(tid, requirements=["x"]) for tid in ("T1", "T2", "T1", "T3", "T2")
+    ]
+    with pytest.raises(ValueError, match="Duplicate threat ids: 'T1', 'T2'$"):
         Report([Scenario(name="S1", dataflows=[])], threats=threats).generate()
 
 

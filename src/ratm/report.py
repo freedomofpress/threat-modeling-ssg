@@ -1,3 +1,5 @@
+from collections import Counter
+
 from . import scales
 from .components import Component, Mitigation, Property, Scenario, Threat, ThreatActor
 
@@ -61,18 +63,18 @@ class Report:
             prefix = f"Threat {threat.id}"
             if threat.status not in scales.THREAT_STATUSES:
                 raise ValueError(f"{prefix} has unknown status '{threat.status}'")
-            _check_label(prefix, "impact", threat.impact_label, scales.IMPACT_SCORES)
-            _check_label(
-                prefix, "likelihood", threat.likelihood_label, scales.LIKELIHOOD_SCORES
+            _check_in_scale(threat.impact_label, scales.IMPACT_SCORES, prefix, "impact")
+            _check_in_scale(
+                threat.likelihood_label, scales.LIKELIHOOD_SCORES, prefix, "likelihood"
             )
-            _check_label(
-                prefix, "residual impact", threat.residual_impact, scales.IMPACT_SCORES
+            _check_in_scale(
+                threat.residual_impact, scales.IMPACT_SCORES, prefix, "residual impact"
             )
-            _check_label(
-                prefix,
-                "residual likelihood",
+            _check_in_scale(
                 threat.residual_likelihood,
                 scales.LIKELIHOOD_SCORES,
+                prefix,
+                "residual likelihood",
             )
             for mid in [*threat.mitigations, *threat.further_mitigations]:
                 if mid not in mitigation_ids:
@@ -103,14 +105,14 @@ class Report:
 
 
 def _unique_ids(kind: str, ids: list[str]) -> set[str]:
-    seen = set()
-    for item in ids:
-        if item in seen:
-            raise ValueError(f"Duplicate {kind} id '{item}'")
-        seen.add(item)
-    return seen
+    # Name every duplicate at once, so fixing them takes one run, not one per id.
+    duplicates = [item for item, count in Counter(ids).items() if count > 1]
+    if duplicates:
+        names = ", ".join(f"'{item}'" for item in duplicates)
+        raise ValueError(f"Duplicate {kind} ids: {names}")
+    return set(ids)
 
 
-def _check_label(prefix: str, field: str, value: str | None, scale: dict) -> None:
+def _check_in_scale(value: str | None, scale: dict, prefix: str, field: str) -> None:
     if value is not None and value not in scale:
         raise ValueError(f"{prefix} has unknown {field} '{value}'")
