@@ -221,6 +221,46 @@ tm.Threat(
     ),
 )
 
+# "a | b" in a requirement matches when either side does. This threat applies to every
+# component that asks for credentials or keeps them.
+tm.Threat(
+    "RATM-5-STOLEN-CREDS",
+    requirements=["requires_credentials | stores_secrets"],
+    mitigations=["MIT-STRONG-CREDS"],
+    further_mitigations=["MIT-ENCRYPT-SECRETS"],
+    status="partially mitigated",
+    impact="High",
+    likelihood="Low",
+    threat_actors=["Any"],
+    comment="Whoever holds a publishing credential can publish as us",
+    capec_info=CAPECInfo(
+        description="Stolen publishing credentials",
+        details=(
+            "A token copied from the dev machine, or phished for one of the"
+            " registries, lets someone else publish a release."
+        ),
+    ),
+)
+
+# A threat can also name the components it applies to, with `components`, regardless of
+# their properties. Naming a boundary covers everything inside it, in this case the dev host.
+tm.Threat(
+    "RATM-6-DEV-HOST",
+    components=["Dev host"],
+    status="accepted",
+    impact="High",
+    likelihood="Very Low",
+    threat_actors=["Any"],
+    comment="Everything built on a compromised laptop is suspect",
+    capec_info=CAPECInfo(
+        description="Compromised developer host",
+        details=(
+            "Malware on the dev host can change the model, the generated report,"
+            " or the package before any of them leaves the machine."
+        ),
+    ),
+)
+
 
 # -- Boundaries
 
@@ -277,10 +317,14 @@ BROWSER = tm.Component(
     executes_code=True,
 )
 
+# Tags label parts of the model. The site shows them as badges and draws tagged
+# components dashed in the diagrams. A threat found only on components sharing a tag
+# gets that tag too.
 PYPI = tm.Component(
     name="PyPI servers",
     description="Where the ratm package is released.",
     boundary=THE_INTERNET,
+    tags=["Third party"],
     requires_credentials=True,
     uses_strong_credentials=True,
     publishes_code=True,
@@ -290,6 +334,7 @@ NPM = tm.Component(
     name="NPM servers",
     description="Where the vendored JavaScript dependencies come from.",
     boundary=THE_INTERNET,
+    tags=["Third party"],
     requires_credentials=True,
     uses_strong_credentials=True,
     publishes_code=True,
@@ -321,6 +366,7 @@ PAGES = tm.Component(
     name="Static site host",
     description="Serves the published report to anyone with the URL.",
     boundary=THE_INTERNET,
+    tags=["Third party"],
     requires_credentials=True,
     is_exposed=True,
 )
