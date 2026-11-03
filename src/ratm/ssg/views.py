@@ -8,7 +8,7 @@ from .models import Component, SiteConfig, ThreatModel, _token_satisfied
 from .utils import display_token, slugify, view
 
 
-@view("/index.html", log="Generating index.html...")
+@view("/index.html")
 def summary_view(
     config: SiteConfig,
     model: ThreatModel,
@@ -16,7 +16,7 @@ def summary_view(
     return {"config": config, "model": model, "analysis": model.analyze()}
 
 
-@view("/threats.html", log="Generating threats.html...")
+@view("/threats.html")
 def threats_view(
     config: SiteConfig,
     model: ThreatModel,
@@ -148,7 +148,8 @@ _PLURAL_CLASSES = {
 }
 
 
-@view("/components.html", log="Generating components.html...")
+@view("/components.html")
+@view("/components.html")
 def components_view(
     config: SiteConfig,
     model: ThreatModel,
@@ -246,7 +247,7 @@ def scenario_view(
         }
 
 
-@view("/scenarios.html", log="Generating scenarios.html...")
+@view("/scenarios.html")
 def scenarios_view(
     config: SiteConfig,
     model: ThreatModel,
@@ -254,7 +255,7 @@ def scenarios_view(
     return {"config": config, "model": model}
 
 
-@view("/threats_components.html", log="Generating threats_components.html...")
+@view("/threats_components.html")
 def threats_components_view(
     config: SiteConfig,
     model: ThreatModel,

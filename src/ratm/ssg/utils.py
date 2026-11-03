@@ -27,6 +27,8 @@ def view(
     path_template = path.lstrip("/")
     template_name = template or path_template
 
+    log = log or f"Generating {path_template}..."
+
     def decorator(func: Callable[..., Mapping[str, Any] | Iterable[Mapping[str, Any]]]):
         VIEWS.append(
             ViewSpec(
