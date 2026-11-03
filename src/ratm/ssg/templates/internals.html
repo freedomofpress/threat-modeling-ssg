@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% set active_page = "internals.html" %}
+{% block title %}Model internals - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Model internals</h1>
+
+<p>These views are made for the threat-model writers, and show how threats are matched to components and how the properties and mitigations apply.</p>
+
+<ul class="internals-list">
+    <li><a href="components.html">Components</a>: every component in the model, with its properties.</li>
+    <li><a href="threats_components.html">Threats × components matrix</a>: every threat we list, against every component in our model.</li>
+</ul>
+
+<h2>Component properties</h2>
+<ul class="internals-list">
+    {% for key, prop in model.properties.items() %}
+    <li><a href="property_{{ key | slugify }}.html">{{ key | replace('_', ' ') | replace('!', 'not ') | title }}</a>{% if prop.description %} <span class="muted">{{ prop.description }}</span>{% endif %}</li>
+    {% endfor %}
+</ul>
+{% endblock %}

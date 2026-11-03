@@ -892,6 +892,19 @@ footer {
     opacity: 0.6;
 }
 
+.footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 20px;
+    margin-bottom: 8px;
+}
+
+.internals-list {
+    display: grid;
+    gap: 8px;
+}
+
 .freq-cell {
     font-weight: bold;
     color: var(--color-1);

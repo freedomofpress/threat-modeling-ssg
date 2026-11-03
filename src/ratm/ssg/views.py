@@ -180,6 +180,14 @@ def components_view(
     return {"config": config, "model": model, "class_tables": class_tables}
 
 
+@view("/internals.html")
+def internals_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> dict[str, Any]:
+    return {"config": config, "model": model}
+
+
 @view(
     "/property_{prop_slug}.html",
     template="property.html",
