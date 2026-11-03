@@ -23,7 +23,6 @@
                         ("index.html", "Summary"),
                         ("threats.html", "Threats"),
                         ("scenarios.html", "Scenarios"),
-                        ("components.html", "Components"),
                     ] %}
                     <a href="{{ href }}"{% if href == active_page | default('') %} class="nav-active"{% endif %}>{{ label }}</a>
                     {% endfor %}
@@ -42,6 +41,7 @@
         <footer>
             <nav class="footer-nav">
                 <a href="internals.html"{% if active_page | default('') == "internals.html" %} class="nav-active"{% endif %}>Model internals</a>
+                <a href="components.html"{% if active_page | default('') == "components.html" %} class="nav-active"{% endif %}>Components</a>
             </nav>
             Thanks to <a href="https://lospec.com/palette-list/slso8">Luis Miguel Maldonado</a> for the colors!
         </footer>
