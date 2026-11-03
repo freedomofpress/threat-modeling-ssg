@@ -4,15 +4,6 @@
 {% block title %}Summary - Threat Model{% endblock %}
 
 {% block content %}
-{% set diagram_scenarios = model.scenarios | selectattr("dfd") | list %}
-{% if diagram_scenarios %}
-{% for scenario in diagram_scenarios %}
-<details class="scenario-diagram" name="scenario-picker"{% if loop.first %} open{% endif %}>
-    <summary>{{ scenario.name }}</summary>
-    {% with src=scenario.dfd %}{% include "includes/dfd_diagram.html" %}{% endwith %}
-</details>
-{% endfor %}
-{% endif %}
 
 <div class="stats">
     <a href="/threats.html" class="count-box count-box--red">
