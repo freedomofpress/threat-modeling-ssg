@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% set active_page = "internals.html" %}
+{% block title %}Component properties - Threat Model{% endblock %}
+
+{% block content %}
+<h1>Component properties</h1>
+
+<p>Which properties each component has, including those inherited from its boundary. Threats are matched to components through these. Part of the <a href="internals.html">model internals</a>.</p>
+
+{% include "includes/components_table.html" %}
+{% endblock %}

@@ -50,3 +50,16 @@ Generating the report fails with an error naming the problem when:
 - a status is not one of the values above
 - an impact or likelihood is given but is not on its scale
 - two threats, mitigations, or threat actors share an id or name
+
+## Source links
+
+Each threat, mitigation, threat actor, component, and scenario page shows the file and line of the model script that defines it, for example "Defined in demo/model.py:42". ratm records this when the model script creates the object. The path is relative to the git checkout that holds the script, or to the current directory when the script is not in a checkout. Failing both, it is just the file name.
+
+To link those lines to the code, set `github_repo` in the site config to the repository the model script lives in, and `github_branch` if it is not `main`:
+
+```toml
+github_repo = "https://github.com/example/threat-model"
+github_branch = "main"
+```
+
+`ratm` reads `config.toml` from the current directory, or the file passed with `--config`. A link then points to `<github_repo>/blob/<github_branch>/<file>#L<line>`. Without `github_repo`, the file and line are shown as plain text.

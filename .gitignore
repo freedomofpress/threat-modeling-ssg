@@ -3,4 +3,5 @@ output/
 report.json
 src/ratm/ssg/templates/assets/*.js
 !src/ratm/ssg/templates/assets/diagrams.js
+!src/ratm/ssg/templates/assets/table-tools.js
 *.pyc

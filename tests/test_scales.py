@@ -52,6 +52,12 @@ def test_every_possible_score_has_a_band() -> None:
     assert all(scales.risk_band(s) for s in scores)
 
 
+def test_open_statuses_come_first() -> None:
+    assert tuple(scales.THREAT_STATUSES)[: len(scales.OPEN_STATUSES)] == (
+        scales.OPEN_STATUSES
+    )
+
+
 def test_open_statuses() -> None:
     assert set(scales.OPEN_STATUSES) <= set(scales.THREAT_STATUSES)
 

@@ -315,7 +315,11 @@ def test_analysis_distributions_and_actors(model_factory) -> None:
     )
     analysis = model.analyze()
     assert analysis["impact_distribution"] == {"High": 1, "Low": 1}
-    assert analysis["status_distribution"] == {"unmanaged": 1, "mitigated": 1}
+    # Status counts include every defined threat, as the register's status filter does,
+    # and put the statuses most in need of attention first, so unmanaged comes before
+    # mitigated.
+    assert analysis["status_distribution"] == {"unmanaged": 2, "mitigated": 1}
+    assert list(analysis["status_distribution"]) == ["unmanaged", "mitigated"]
     # The actor mapping includes every defined threat, even ones no scenario finds.
     assert analysis["actors_to_threats"] == {"Any": ["T1", "T3"], "Troll": ["T3"]}
 
@@ -394,3 +398,135 @@ def test_threat_open_and_bands() -> None:
     assert threat.residual_risk_band == "medium"
     assert Threat(SID="T", status="accepted").is_open is False
     assert Threat(SID="T").risk_band is None
+
+
+def test_backlog_ranks_proposed_mitigations_by_threat_risk(model_factory) -> None:
+    model = model_factory(
+        threats={
+            "T1": Threat(
+                SID="T1",
+                status="unmanaged",
+                impact="High",
+                likelihood="High",
+                mapping=ThreatMapping(further_mitigations=["M-LOW", "M-HIGH"]),
+            ),
+            "T2": Threat(
+                SID="T2",
+                status="accepted",
+                impact="Low",
+                likelihood="Low",
+                mapping=ThreatMapping(further_mitigations=["M-LOW"]),
+            ),
+            "T3": Threat(
+                SID="T3",
+                impact="Medium",
+                likelihood="Low",
+                mapping=ThreatMapping(mitigations=["M-LOW"]),
+            ),
+        },
+        components={},
+        scenarios=[],
+        mitigations={
+            "M-LOW": Mitigation(id="M-LOW", title="Low", status="proposed"),
+            "M-HIGH": Mitigation(id="M-HIGH", title="High", status="proposed"),
+            "M-DONE": Mitigation(id="M-DONE", title="Done"),
+            "M-UNUSED": Mitigation(id="M-UNUSED", title="Unused", status="proposed"),
+        },
+    )
+    backlog = model.backlog()
+    # Both reach risk 12 through T1. M-LOW covers more open threats, so it wins the tie.
+    # The implemented mitigation is not in the backlog.
+    assert [row["mitigation"].id for row in backlog] == ["M-LOW", "M-HIGH", "M-UNUSED"]
+    assert backlog[1]["open_count"] == 1
+    low = backlog[0]
+    # Threats that list it in place or as a further mitigation, highest risk first.
+    assert [tid for tid, _ in low["threats"]] == ["T1", "T3", "T2"]
+    assert low["top_risk"] == 12
+    assert low["open_count"] == 2
+    assert backlog[2]["threats"] == [] and backlog[2]["top_risk"] is None
+
+
+def test_open_risk_summary() -> None:
+    model = ThreatModel(
+        threats={
+            "T1": Threat(SID="T1", status="unmanaged", impact="Low", likelihood="Low"),
+            "T2": Threat(
+                SID="T2",
+                status="partially mitigated",
+                impact="High",
+                likelihood="High",
+                residual_likelihood="Low",
+            ),
+            "T3": Threat(
+                SID="T3", status="mitigated", impact="High", likelihood="High"
+            ),
+        },
+        components={},
+        scenarios=[],
+        properties={},
+    )
+    # Highest risk after mitigations among open threats only: T2's 6, not T3's 12.
+    assert model.open_risk(["T1", "T2", "T3", "missing"]) == {
+        "total": 3,
+        "open": 2,
+        "top_risk": 6,
+    }
+    assert model.open_risk(["T3"]) == {"total": 1, "open": 0, "top_risk": None}
+
+
+def _register_model(model_factory, threats):
+    return model_factory(
+        threats=threats,
+        components={
+            name: Component(name=name, component_class="Process")
+            for name in ("B2", "B10")
+        },
+        scenarios=[
+            Scenario(
+                name="S1",
+                findings=[
+                    Finding(target=target, threat_id=tid)
+                    for tid in threats
+                    if tid != "T-UNFOUND"
+                    for target in ("B10", "B2")
+                ],
+                flows=[Flow(id="1", name="B2 to B10", source="B2", sink="B10")],
+            )
+        ],
+    )
+
+
+def test_register_lists_every_threat_highest_risk_first(model_factory) -> None:
+    model = _register_model(
+        model_factory,
+        {
+            "T-LOW": Threat(SID="T-LOW", impact="Low", likelihood="Low"),
+            "T-HIGH": Threat(SID="T-HIGH", impact="High", likelihood="High"),
+            "T-UNFOUND": Threat(SID="T-UNFOUND", impact="Medium", likelihood="Low"),
+        },
+    )
+    rows = model.register()
+    assert [row["tid"] for row in rows] == ["T-HIGH", "T-UNFOUND", "T-LOW"]
+    assert rows[0]["threat"] is model.threats["T-HIGH"]
+    # Components sort with their numbers compared, and a threat found nowhere has none.
+    assert rows[0]["components"] == ["B2", "B10"]
+    assert rows[1]["components"] == []
+
+
+def test_top_open_risks_keeps_the_highest_open_found_threats(model_factory) -> None:
+    threats = {
+        f"T{n}": Threat(SID=f"T{n}", impact="Low", likelihood="Low") for n in range(12)
+    }
+    threats["T-TOP"] = Threat(SID="T-TOP", impact="High", likelihood="High")
+    threats["T-ACCEPTED"] = Threat(
+        SID="T-ACCEPTED", status="accepted", impact="High", likelihood="High"
+    )
+    threats["T-UNFOUND"] = Threat(SID="T-UNFOUND", impact="High", likelihood="High")
+    model = _register_model(model_factory, threats)
+
+    top = [row["tid"] for row in model.top_open_risks()]
+    assert len(top) == 10
+    # Highest risk first. Accepted and unfound threats are left out.
+    assert top[0] == "T-TOP"
+    assert "T-ACCEPTED" not in top and "T-UNFOUND" not in top
+    assert [row["tid"] for row in model.top_open_risks(limit=2)] == top[:2]

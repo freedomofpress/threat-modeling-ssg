@@ -6,14 +6,15 @@ worked out from the labels when needed and are not written to the report JSON.
 
 import re
 
+# Dictionary insertion order puts statuses most in need of attention first.
 THREAT_STATUSES = {
     "unmanaged": "No decision has been made about this threat yet.",
+    "partially mitigated": "Some controls are in place, but the risk is still too high.",
     "accepted": "The team has decided to live with this risk.",
     "transferred": "Someone else handles this risk, such as an upstream project.",
-    "mitigated": "Controls in place bring the risk down to an acceptable level.",
-    "avoided": "The feature that caused the risk was left out or removed.",
     "inform": "Handled by telling users how to protect themselves.",
-    "partially mitigated": "Some controls are in place, but the risk is still too high.",
+    "avoided": "The feature that caused the risk was left out or removed.",
+    "mitigated": "Controls in place bring the risk down to an acceptable level.",
     "out of scope": "Outside what this threat model covers.",
 }
 DEFAULT_THREAT_STATUS = "unmanaged"

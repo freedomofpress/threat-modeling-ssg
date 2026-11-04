@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from ratm import Ratm, Scenario
-from ratm.ssg.cli import build_env
+from ratm.ssg.cli import TEMPLATES_DIR, build_env
 from ratm.ssg.models import SiteConfig, ThreatModel
 from ratm.ssg.utils import render_views
 
@@ -90,6 +90,11 @@ def test_render_all_views(tmp_path: Path) -> None:
         "index.html",
         "threats.html",
         "threats_components.html",
+        "threat_rules.html",
+        "internals.html",
+        "guide.html",
+        "backlog.html",
+        "component_properties.html",
         "components.html",
         "scenarios.html",
         "mitigations.html",
@@ -111,7 +116,6 @@ def test_threat_page_contents(tmp_path: Path) -> None:
     render(author_model(), tmp_path)
     page = (tmp_path / "threat_T-INPUT.html").read_text()
     assert "partially mitigated" in page
-    assert "capec.mitre.org" not in page
     assert "Legacy parsers remain" in page
     for needle in (
         "mitigation_M-SANITIZE.html",
@@ -120,11 +124,49 @@ def test_threat_page_contents(tmp_path: Path) -> None:
         "threat_T-DEPS.html",
     ):
         assert needle in page, needle
-    # risk 9 (High x Medium) and residual 6 (High x Low)
-    assert '<div class="count-box__value">9</div>' in page
-    assert "after mitigations: 6" in page
+    # The risk line shows risk 9 (High x Medium) and residual risk 6 (High x Low).
+    assert (
+        'High impact × Medium likelihood = <span class="risk"><span class="risk-value">9'
+        in page
+    )
+    assert (
+        'High impact × Low likelihood = <span class="risk"><span class="risk-value">6'
+        in page
+    )
+    # The risk line comes before the details, notes, and matching rules.
+    order = [
+        page.index('class="risk-line"'),
+        page.index("<h2>Mitigations</h2>"),
+        page.index("<h2>Notes</h2>"),
+        page.index("How this threat is matched"),
+    ]
+    assert order == sorted(order)
     child = (tmp_path / "threat_T-DEPS.html").read_text()
     assert "threat_T-INPUT.html" in child
+
+
+def test_register_lists_threats_in_risk_order(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    page = (tmp_path / "threats.html").read_text()
+    assert 'id="register"' in page and "data-sortable" in page
+    # Residual 6 (High x Low), then 4 (Medium x Low), then unknown.
+    order = [
+        page.index(f'href="threat_{tid}.html"')
+        for tid in ("T-INPUT", "T-DEPS", "T-BARE")
+    ]
+    assert order == sorted(order)
+    # Filter values for the status select, including the open group.
+    assert 'data-status="partially mitigated|open"' in page
+    assert '<option value="open">' in page
+
+
+def test_sortable_pages_load_the_table_script(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    script = '<script src="assets/table-tools.js"></script>'
+    for name in ("threats.html", "mitigations.html"):
+        assert script in (tmp_path / name).read_text(), name
+    # ratm copies this directory into the site's assets.
+    assert (TEMPLATES_DIR / "assets" / "table-tools.js").is_file()
 
 
 def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
@@ -133,8 +175,30 @@ def test_mitigation_and_actor_pages(tmp_path: Path) -> None:
     assert "threat_T-INPUT.html" in mit
     listing = (tmp_path / "mitigations.html").read_text()
     assert "mitigation_M-WAF.html" in listing and "proposed" in listing
+    assert 'data-filter-for="mitigation-list"' in listing
+    # The list shows counts, not ids. M-SANITIZE mitigates one threat.
+    assert "1 threat</td>" in listing
+    backlog = (tmp_path / "backlog.html").read_text()
+    # M-WAF is proposed for T-INPUT (residual 6) and is the only backlog entry.
+    assert 'href="mitigation_M-WAF.html"' in backlog
+    assert 'href="mitigation_M-SANITIZE.html"' not in backlog
+    assert 'href="threat_T-INPUT.html"' in backlog
     actor = (tmp_path / "threat_actor_Any.html").read_text()
     assert "threat_T-INPUT.html" in actor and "threat_T-DEPS.html" in actor
+
+
+def test_summary_leads_with_open_risk(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    index = (tmp_path / "index.html").read_text()
+    # Status counts link to the register filtered to that status.
+    assert 'href="threats.html?status=partially%20mitigated"' in index
+    assert 'href="threats.html?status=open"' in index
+    # Top open risks lists T-INPUT, which is open and applies. T-DEPS is mitigated and
+    # T-BARE is out of scope, so neither is listed.
+    top = index[index.index("Top open risks") :]
+    assert 'href="threat_T-INPUT.html"' in top
+    assert 'href="threat_T-DEPS.html"' not in top
+    assert "dfd-container" not in index
 
 
 def test_summary_and_matrix(tmp_path: Path) -> None:
@@ -142,7 +206,7 @@ def test_summary_and_matrix(tmp_path: Path) -> None:
     matrix = (tmp_path / "threats_components.html").read_text()
     # The legend also uses this class, so match the cell markup itself.
     assert '<td class="prop-cell status--partially-mitigated"' in matrix
-    assert '<span class="tag tag--text">M-SANITIZE</span>' in matrix
+    assert '<span class="tag tag--text">Sanitize input</span>' in matrix
     prop = (tmp_path / "property_reads_input.html").read_text()
     assert "threat_T-INPUT.html" in prop
 
@@ -175,11 +239,11 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
         "component_Web_app.html",
     ):
         assert escaped in (tmp_path / name).read_text(), name
-    # Inside an attribute, from a macro, and from an include.
-    assert f'title="{escaped}"' in (tmp_path / "component_Web_app.html").read_text()
-    assert (
-        f'title="{escaped}"' in (tmp_path / "scenario_Handle_request.html").read_text()
-    )
+    # Escaped in link text too, from a macro on the component page and from an include
+    # on the scenario page.
+    link = f'<a href="mitigation_M-SANITIZE.html">{escaped}</a>'
+    assert link in (tmp_path / "component_Web_app.html").read_text()
+    assert link in (tmp_path / "scenario_Handle_request.html").read_text()
 
     for page_path in tmp_path.glob("*.html"):
         page = page_path.read_text()
@@ -188,10 +252,10 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
         for needle in ("&amp;amp;", "&amp;#34;", "&lt;span", "&lt;a "):
             assert needle not in page, (page_path.name, needle)
 
-    # The components table marks properties with the characters ✓ and ✗. Written as
-    # &#x2713; entities, they would be escaped and shown as literal text.
-    components = (tmp_path / "components.html").read_text()
-    assert ">✓</td>" in components and ">✗</td>" in components
+    # The component properties table marks properties with the characters ✓ and ✗.
+    # Written as &#x2713; entities, they would be escaped and shown as literal text.
+    properties = (tmp_path / "component_properties.html").read_text()
+    assert ">✓</td>" in properties and ">✗</td>" in properties
 
     # In the page, the diagram source is escaped. Decoding it must give back exactly the
     # DOT and Mermaid text, since that is what diagrams.js passes to Viz and Mermaid.
@@ -200,7 +264,8 @@ def test_model_text_is_escaped(tmp_path: Path) -> None:
     assert "label = &lt;&lt;i&gt;Net&lt;/i&gt;&gt;;" in page
     assert diagram_sources(page) == [scenario.dfd, scenario.mermaid]
     assert "label = <<i>Net</i>>;" in scenario.dfd
-    for name in ("index.html", "scenarios.html", "threat_T-INPUT.html"):
+    # The summary page has no diagrams, but the scenario index and threat pages do.
+    for name in ("scenarios.html", "threat_T-INPUT.html"):
         sources = diagram_sources((tmp_path / name).read_text())
         assert sources, name
         assert all(s.startswith(("digraph tm {", "sequenceDiagram")) for s in sources)
@@ -282,3 +347,57 @@ def test_builds_are_reproducible(tmp_path: Path) -> None:
     assert (builds[0] / "threat_RATM-4-EXEC.html").exists()
     for other in builds[1:]:
         assert differing_files(builds[0], other) == [], other.name
+
+
+def test_guide_explains_statuses_and_scores(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    guide = (tmp_path / "guide.html").read_text()
+    for status in ("unmanaged", "partially mitigated", "out of scope", "proposed"):
+        assert status in guide, status
+    # The risk grid: High impact x High likelihood is the maximum, 12.
+    assert 'data-impact="High" data-likelihood="High">12' in guide
+
+
+def test_components_and_scenarios_show_open_risk(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    components = (tmp_path / "components.html").read_text()
+    # Web app and Worker both carry the open T-INPUT (residual 6). The table of
+    # component properties is on its own page, linked from the internals page, not on
+    # the components page.
+    assert 'href="component_Web_app.html"' in components
+    assert "prop-table" not in components
+    assert "prop-table" in (tmp_path / "component_properties.html").read_text()
+    assert (
+        'href="component_properties.html"' in (tmp_path / "internals.html").read_text()
+    )
+    scenarios = (tmp_path / "scenarios.html").read_text()
+    assert "1 open threat" in scenarios
+    scenario = (tmp_path / "scenario_Handle_request.html").read_text()
+    assert "1 open threat" in scenario
+
+
+def test_pages_link_to_source(tmp_path: Path) -> None:
+    report = author_model()
+    model = ThreatModel.model_validate(json.loads(json.dumps(report)))
+    config = SiteConfig(github_repo="https://example.org/ratm", github_branch="dev")
+    model.prepare_scenarios(config)
+    render_views(build_env(), tmp_path, {"config": config, "model": model})
+    base = "https://example.org/ratm/blob/dev/tests/test_smoke.py#L"
+    for name in (
+        "threat_T-INPUT.html",
+        "mitigation_M-SANITIZE.html",
+        "component_Web_app.html",
+        "threat_actor_Any.html",
+        "scenario_Handle_request.html",
+    ):
+        assert f'href="{base}' in (tmp_path / name).read_text(), name
+    # Only repository-relative paths reach the pages.
+    here = str(Path(__file__).resolve().parent.parent)
+    for page in tmp_path.glob("*.html"):
+        assert here not in page.read_text(), page.name
+
+
+def test_source_shown_without_repository(tmp_path: Path) -> None:
+    render(author_model(), tmp_path)
+    page = (tmp_path / "threat_T-INPUT.html").read_text()
+    assert "Defined in <code>tests/test_smoke.py:" in page
