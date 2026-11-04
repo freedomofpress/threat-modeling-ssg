@@ -53,7 +53,7 @@
 <h2>Scenarios</h2>
 <ul>
     {% for scenario in model.scenarios %}
-    <li><a href="scenario_{{ scenario.name.replace(' ', '_') }}.html">{{ scenario.name }}</a> — {{ scenario.findings | length }} findings</li>
+    <li><a href="scenario_{{ scenario.name | slugify }}.html">{{ scenario.name }}</a> — {{ scenario.findings | length }} findings</li>
     {% endfor %}
 </ul>
 

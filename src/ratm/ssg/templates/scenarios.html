@@ -4,7 +4,7 @@
 
 {% block content %}
 {% for scenario in model.scenarios %}
-{% set slug = scenario.name.replace(' ', '_') %}
+{% set slug = scenario.name | slugify %}
 <section class="scenario-list-item">
     <h2>
         <a href="scenario_{{ slug }}.html">{{ scenario.name }}</a>

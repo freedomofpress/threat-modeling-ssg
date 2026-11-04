@@ -63,7 +63,7 @@
 {% if scenarios %}
 <ul>
     {% for scenario_name in scenarios %}
-    <li><a href="scenario_{{ scenario_name.replace(' ', '_') }}.html">{{ scenario_name }}</a></li>
+    <li><a href="scenario_{{ scenario_name | slugify }}.html">{{ scenario_name }}</a></li>
     {% endfor %}
 </ul>
 {% else %}

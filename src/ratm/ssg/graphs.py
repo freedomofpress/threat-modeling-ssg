@@ -1,3 +1,4 @@
+import html
 import re
 from collections import defaultdict
 
@@ -16,6 +17,11 @@ NODE_SHAPES = {
     "Datastore": "cylinder",
     "Server": "box",
 }
+
+
+def dot_string(text: str) -> str:
+    """Escape text for a double-quoted DOT string."""
+    return text.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def generate_dataflow(scenario: Scenario, components: dict[str, Component]) -> str:
@@ -75,7 +81,7 @@ def generate_dataflow(scenario: Scenario, components: dict[str, Component]) -> s
     def emit_node(comp: Component, indent: str) -> None:
         _id = node_id(comp)
         shape = NODE_SHAPES.get(comp.component_class, "circle")
-        label = wrap_label(comp.name)
+        label = wrap_label(dot_string(comp.name))
         lines.extend(
             [
                 f"{indent}{_id} [",
@@ -84,7 +90,7 @@ def generate_dataflow(scenario: Scenario, components: dict[str, Component]) -> s
                 f"{indent}    fontcolor = black;",
                 f'{indent}    label = "{label}";',
                 f'{indent}    URL = "component_{slug(comp.name)}.html";',
-                f'{indent}    tooltip = "{comp.name}";',
+                f'{indent}    tooltip = "{dot_string(comp.name)}";',
                 f"{indent}    margin = 0.02;",
                 f"{indent}]",
                 "",
@@ -109,7 +115,9 @@ def generate_dataflow(scenario: Scenario, components: dict[str, Component]) -> s
                 f"{indent}        fontcolor = black;",
                 f"{indent}        style = dashed;",
                 f"{indent}        color = firebrick2;",
-                f"{indent}        label = <<i>{name}</i>>;",
+                # Graphviz reads <...> as an HTML-like label (here, for the italics), so
+                # the name is escaped as HTML.
+                f"{indent}        label = <<i>{html.escape(name)}</i>>;",
                 f"{indent}    ]",
                 "",
             ]
@@ -152,7 +160,7 @@ def generate_dataflow(scenario: Scenario, components: dict[str, Component]) -> s
         src = name_to_id.get(flow.source)
         snk = name_to_id.get(flow.sink)
         if src and snk:
-            label = wrap_label(f"{i}. {flow.name}", width=20).replace('"', '\\"')
+            label = wrap_label(dot_string(f"{i}. {flow.name}"), width=20)
             lines.extend(
                 [
                     (
@@ -179,8 +187,17 @@ def generate_highlighted_dataflow(dfd: str, highlight_components: set) -> str:
     def highlighter(match):
         node_id = match.group(1)
         attrs = match.group(2)
-        label_match = re.search(r'label\s*=\s*"([^"]*)"', attrs)
-        label = label_match.group(1).replace("\\n", " ") if label_match else None
+        label_match = re.search(r'label\s*=\s*"((?:[^"\\]|\\.)*)"', attrs)
+        # Undo dot_string(), and turn wrap_label()'s line breaks into spaces.
+        label = (
+            re.sub(
+                r"\\(.)",
+                lambda m: " " if m.group(1) == "n" else m.group(1),
+                label_match.group(1),
+            )
+            if label_match
+            else None
+        )
         if label and label in highlight_components:
             indent_match = re.search(r"^(\s+)\S", attrs, re.MULTILINE)
             indent = indent_match.group(1) if indent_match else "        "

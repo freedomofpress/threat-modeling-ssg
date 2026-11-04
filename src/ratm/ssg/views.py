@@ -63,7 +63,9 @@ def threat_view(
     scenario_by_name = model.scenario_by_name()
     for threat_id, threat in model.threats.items():
         scenario_names = analysis["threats_to_scenarios"].get(threat_id, [])
-        affected_components = analysis["threats_to_components"].get(threat_id, set())
+        affected_components = sorted(
+            analysis["threats_to_components"].get(threat_id, set())
+        )
         threat_scenario_data = []
         for scenario_name in scenario_names:
             scenario = scenario_by_name.get(scenario_name)
@@ -112,7 +114,7 @@ def component_view(
 ) -> Iterable[dict[str, Any]]:
     analysis = model.analyze()
     for name, component in model.components.items():
-        threat_ids = analysis["components_to_threats"].get(name, set())
+        threat_ids = sorted(analysis["components_to_threats"].get(name, set()))
         scenario_names = list(
             dict.fromkeys(
                 s.name
@@ -234,7 +236,7 @@ def scenario_view(
             "config": config,
             "model": model,
             "scenario": scenario,
-            "scenario_name": scenario.name.replace(" ", "_"),
+            "scenario_name": slugify(scenario.name),
         }
 
 

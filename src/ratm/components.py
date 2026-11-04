@@ -340,7 +340,7 @@ class Scenario:
         return {
             # FIXME: Improve this dictionary
             "file": "",
-            "description": self.description,
+            "description": self.description or "",
             "name": self.name,
             "flows": [f.to_dict() for f in self.dataflows],
             "findings": [dataclasses.asdict(f) for f in self.findings],

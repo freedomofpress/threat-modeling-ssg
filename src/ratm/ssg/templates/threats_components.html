@@ -55,7 +55,7 @@
             {% set cell = status[tid].get(comp_name) %}
             {% if cell %}
             <td class="prop-cell {{ 'prop-mit' if cell.mitigated else 'prop-req' }}">
-                {{ '&#x2713;' if cell.mitigated else '&#x2717;' }}
+                {{ '✓' if cell.mitigated else '✗' }}
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
                     <span class="cell-tip__meta">{{ comp_name }} — {{ 'mitigated' if cell.mitigated else 'not mitigated' }}</span>

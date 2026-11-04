@@ -96,7 +96,7 @@
 {% for item in threat_scenario_data %}
 <details class="scenario-details" open>
     <summary>
-        <a href="scenario_{{ item.scenario.name.replace(' ', '_') }}.html">{{ item.scenario.name }}</a>
+        <a href="scenario_{{ item.scenario.name | slugify }}.html">{{ item.scenario.name }}</a>
         <span class="affected-components-inline">
             — affects:
             {% for comp in item.affected_components %}
