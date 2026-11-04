@@ -78,6 +78,9 @@ def threat_rules_view(
         "model": model,
         "analysis": model.analyze(),
         "impact_tables": impact_tables,
+        "listed_only": sum(
+            1 for t in model.threats.values() if not t.mapping.requirements
+        ),
     }
 
 
@@ -167,6 +170,11 @@ def component_view(
             "comp_name": name,
             "component": component,
             "threats": threats,
+            # Findings never target a boundary, so its page lists the threats that name
+            # it, or a boundary around it, instead.
+            "boundary_threats": model.listed_threats(name)
+            if component.component_class == "Boundary"
+            else [],
             "scenarios": scenario_names,
             "component_name": slugify(name),
         }
@@ -271,6 +279,7 @@ def property_view(
         slug = slugify(prop_key)
         yield {
             "config": config,
+            "model": model,
             "prop": prop_key,
             "prop_slug": slug,
             "data": {
@@ -355,17 +364,19 @@ def threats_components_view(
         key=_threat_sort_key,
     )
 
-    affected: dict[str, Component] = {}
-    # Names of the components each threat applies to. A cell is filled when the
-    # component is in its threat's set.
-    applies: dict[str, set[str]] = {}
-    for tid, threat in active_threats:
-        applies[tid] = set()
-        for comp_name, comp in model.components.items():
-            if not threat.applies_to(comp):
-                continue
-            affected[comp_name] = comp
-            applies[tid].add(comp_name)
+    # Names of the components each threat applies to, from the findings, so listed
+    # components and requirement matches both count. A cell is filled when the component
+    # is in its threat's set.
+    applies: dict[str, set[str]] = {
+        tid: set(analysis["threats_to_components"].get(tid, set()))
+        for tid, _ in active_threats
+    }
+    affected: dict[str, Component] = {
+        name: model.components[name]
+        for names in applies.values()
+        for name in names
+        if name in model.components
+    }
 
     sorted_components = sorted(
         affected.items(), key=lambda x: (x[1].component_class, x[0])
@@ -426,6 +437,44 @@ def backlog_view(
 
 
 @view(
+    "/coverage.html",
+    log=lambda count: (
+        "Generating coverage.html..."
+        if count
+        else "Skipping coverage.html: no mitigation records verification or tests."
+    ),
+)
+def coverage_view(
+    config: SiteConfig,
+    model: ThreatModel,
+) -> list[dict[str, Any]]:
+    """Which implemented mitigations are verified by tests."""
+    if not model.tracks_verification:
+        return []
+    coverage = model.test_coverage()
+    uncounted = [
+        f"{n} verified by {method}" for method, n in coverage["methods"].items()
+    ]
+    if coverage["unclassified"]:
+        uncounted.append(f"{coverage['unclassified']} with no verification method yet")
+    return [
+        {
+            "config": config,
+            "model": model,
+            "coverage": coverage,
+            "id_rank": {
+                mid: rank
+                for rank, mid in enumerate(
+                    sorted((m.id for m in coverage["counted"]), key=scales.natural_key)
+                )
+            },
+            # The implemented mitigations left out of the ratio, as phrases.
+            "uncounted": uncounted,
+        }
+    ]
+
+
+@view(
     "/mitigation_{mitigation_id}.html",
     template="mitigation.html",
     log=lambda count: f"Generating {count} mitigation pages...",
@@ -444,6 +493,7 @@ def mitigation_view(
             "threats": mitigating,
             "further_threats": proposing,
             "status_descriptions": scales.MITIGATION_STATUSES,
+            "verification_methods": scales.VERIFICATION_METHODS,
         }
 
 
@@ -506,6 +556,7 @@ def guide_view(
             for s, description in scales.THREAT_STATUSES.items()
         ],
         "mitigation_statuses": list(scales.MITIGATION_STATUSES.items()),
+        "verification_methods": list(scales.VERIFICATION_METHODS.items()),
         "impacts": [(i, scales.IMPACT_SCORES[i]) for i in impacts],
         "likelihoods": [(lk, scales.LIKELIHOOD_SCORES[lk]) for lk in likelihoods],
         "risk_score": scales.risk_score,

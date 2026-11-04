@@ -1,3 +1,4 @@
+{% import "includes/macros.html" as m %}
 {% for group in class_tables %}
 <div class="prop-table-wrap">
 <table class="prop-table">
@@ -17,7 +18,7 @@
         {% for comp_name, component in group.members %}
         <tr>
             <td class="prop-sticky" title="{{ comp_name }}{% if component.inBoundary %} — {{ component.inBoundary }}{% endif %}">
-                <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>
+                <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>{{ m.tag_badges(component.tags) }}
                 {% if component.inBoundary %}<div class="prop-meta">{{ component.inBoundary }}</div>{% endif %}
             </td>
             {% for key in group.props %}

@@ -1,4 +1,4 @@
-from ratm import Ratm
+from ratm import Ratm, TestRef
 from ratm.components import CAPECInfo, Scenario
 
 # [ Demo threat model ]
@@ -40,6 +40,10 @@ tm.define_properties(
 # Each mitigation is its own object with an id, a title, and a status: "implemented",
 # "optional", or "proposed".
 #
+# `verification` says how the mitigation is shown to work: "test", "inspection",
+# "analysis", or "demonstration". `tests` lists the automated tests that check it, as
+# TestRef objects or dicts with the same keys.
+#
 # When a control is a component property, put it in the threat's requirements instead,
 # as RATM-3-SECRETS does with "!encrypts_secrets". The threat then applies only to
 # components without the control.
@@ -48,15 +52,40 @@ tm.Mitigation(
     "MIT-VERIFY-DEPS",
     title="Pin and hash-check dependencies",
     description="Lockfiles with hashes make the registry unable to swap a package.",
+    verification="test",
+    tests=[
+        TestRef(
+            repo="freedomofpress/threat-modeling-ssg",
+            path="tests/test_lockfile.py",
+            name="test_hashes_pinned",
+            line=12,
+            url="https://github.com/freedomofpress/threat-modeling-ssg/blob/main/tests/test_lockfile.py#L12",
+        ),
+        {
+            "repo": "freedomofpress/threat-modeling-ssg",
+            "path": "tests/test_lockfile.py",
+            "name": "test_npm_packages_have_integrity",
+            "line": 30,
+            "url": "https://github.com/freedomofpress/threat-modeling-ssg/blob/main/tests/test_lockfile.py#L30",
+        },
+    ],
 )
 tm.Mitigation(
     "MIT-STRONG-CREDS",
     title="Hardware-backed or short-lived credentials",
+    verification="inspection",
+)
+tm.Mitigation(
+    "MIT-ESCAPE-REPORT",
+    title="Escape model text in the report",
+    description="Titles and descriptions cannot add markup or scripts to the site.",
+    verification="test",
 )
 tm.Mitigation(
     "MIT-ENCRYPT-SECRETS",
     title="Encrypt tokens at rest",
     status="proposed",
+    verification="test",
 )
 tm.Mitigation(
     "MIT-VERIFY-SOURCE",
@@ -68,6 +97,13 @@ tm.Mitigation(
     title="Content Security Policy on the report",
     description="Restricts what the vendored scripts may load or connect to.",
     status="optional",
+    tests=[
+        TestRef(
+            repo="freedomofpress/threat-modeling-ssg",
+            path="tests/test_smoke.py",
+            name="test_pages_set_csp",
+        )
+    ],
 )
 
 # -- Threat actors
@@ -168,7 +204,7 @@ tm.Threat(
 tm.Threat(
     "RATM-4-EXEC",
     requirements=["executes_code"],
-    mitigations=["MIT-CSP"],
+    mitigations=["MIT-CSP", "MIT-ESCAPE-REPORT"],
     further_mitigations=["MIT-VERIFY-SOURCE"],
     status="unmanaged",
     impact="High",
@@ -181,6 +217,46 @@ tm.Threat(
         details=(
             "Both the generator and the browser rendering the report end up"
             " executing code nobody reviewed at that point."
+        ),
+    ),
+)
+
+# "a | b" in a requirement matches when either side does. This threat applies to every
+# component that asks for credentials or keeps them.
+tm.Threat(
+    "RATM-5-STOLEN-CREDS",
+    requirements=["requires_credentials | stores_secrets"],
+    mitigations=["MIT-STRONG-CREDS"],
+    further_mitigations=["MIT-ENCRYPT-SECRETS"],
+    status="partially mitigated",
+    impact="High",
+    likelihood="Low",
+    threat_actors=["Any"],
+    comment="Whoever holds a publishing credential can publish as us",
+    capec_info=CAPECInfo(
+        description="Stolen publishing credentials",
+        details=(
+            "A token copied from the dev machine, or phished for one of the"
+            " registries, lets someone else publish a release."
+        ),
+    ),
+)
+
+# A threat can also name the components it applies to, with `components`, regardless of
+# their properties. Naming a boundary covers everything inside it, in this case the dev host.
+tm.Threat(
+    "RATM-6-DEV-HOST",
+    components=["Dev host"],
+    status="accepted",
+    impact="High",
+    likelihood="Very Low",
+    threat_actors=["Any"],
+    comment="Everything built on a compromised laptop is suspect",
+    capec_info=CAPECInfo(
+        description="Compromised developer host",
+        details=(
+            "Malware on the dev host can change the model, the generated report,"
+            " or the package before any of them leaves the machine."
         ),
     ),
 )
@@ -241,10 +317,14 @@ BROWSER = tm.Component(
     executes_code=True,
 )
 
+# Tags label parts of the model. The site shows them as badges and draws tagged
+# components dashed in the diagrams. A threat found only on components sharing a tag
+# gets that tag too.
 PYPI = tm.Component(
     name="PyPI servers",
     description="Where the ratm package is released.",
     boundary=THE_INTERNET,
+    tags=["Third party"],
     requires_credentials=True,
     uses_strong_credentials=True,
     publishes_code=True,
@@ -254,6 +334,7 @@ NPM = tm.Component(
     name="NPM servers",
     description="Where the vendored JavaScript dependencies come from.",
     boundary=THE_INTERNET,
+    tags=["Third party"],
     requires_credentials=True,
     uses_strong_credentials=True,
     publishes_code=True,
@@ -285,6 +366,7 @@ PAGES = tm.Component(
     name="Static site host",
     description="Serves the published report to anyone with the URL.",
     boundary=THE_INTERNET,
+    tags=["Third party"],
     requires_credentials=True,
     is_exposed=True,
 )

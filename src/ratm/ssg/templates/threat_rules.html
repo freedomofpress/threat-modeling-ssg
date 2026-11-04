@@ -5,7 +5,10 @@
 {% block content %}
 <h1>Matching rules</h1>
 
-<p>Which component properties each threat's requirements use. <strong>R</strong> marks a property the rule checks. <strong>R*</strong> marks a sub-item, negation, or comparison. Highlighted threats apply to at least one component in a scenario. Part of the <a href="internals.html">model internals</a>.</p>
+<p>Which component properties each threat's requirements use. <strong>R</strong> marks a property the rule checks. <strong>R*</strong> marks a sub-item, negation, comparison, or any-of (<code>|</code>) requirement. Highlighted threats apply to at least one component in a scenario. Part of the <a href="internals.html">model internals</a>.</p>
+{% if listed_only %}
+<p>Threats listed for named components, instead of matched by properties, have empty rows here ({{ listed_only }} of {{ model.threats | length }}). The <a href="threats_components.html">threats × components matrix</a> shows where they apply.</p>
+{% endif %}
 
 {% include "includes/threats_table.html" %}
 {% endblock %}
