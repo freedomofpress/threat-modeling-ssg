@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% import "includes/macros.html" as m %}
+{% set active_page = "mitigations.html" %}
+{% block title %}{{ mitigation.id }}: {{ mitigation.title }} - Threat Model{% endblock %}
+
+{% macro threat_rows(threats) %}
+<table>
+    <thead>
+        <tr>
+            <th>Threat ID</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Risk</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tid, threat in threats %}
+        <tr>
+            <td><a href="threat_{{ tid }}.html">{{ tid }}</a></td>
+            <td>{{ threat.description }}</td>
+            <td>{{ m.status_badge(threat.status) }}</td>
+            <td>{{ m.risk(threat) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endmacro %}
+
+{% block content %}
+<h1>{{ mitigation.id }}: {{ mitigation.title }} {{ m.mitigation_status(mitigation) }}</h1>
+
+{% if mitigation.description %}<p>{{ mitigation.description }}</p>{% endif %}
+
+<div class="tag-list">
+</div>
+
+<h2>Threats it mitigates</h2>
+{% if threats %}
+{{ threat_rows(threats) }}
+{% else %}
+<p><em>No threat lists this mitigation.</em></p>
+{% endif %}
+
+{% if further_threats %}
+<h2>Possible further mitigation for</h2>
+{{ threat_rows(further_threats) }}
+{% endif %}
+
+<p><a href="mitigations.html">Back to Mitigations</a> | <a href="index.html">Back to Summary</a></p>
+{% endblock %}

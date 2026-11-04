@@ -9,6 +9,8 @@ class Ratm:
     report_cls = report.Report
     component_properties_cls = components.ComponentProperties
     threat_cls = components.Threat
+    mitigation_cls = components.Mitigation
+    threat_actor_cls = components.ThreatActor
 
     def __init__(
         self,
@@ -26,6 +28,8 @@ class Ratm:
         self.properties = {}
         self.components = {}
         self.threats = {}
+        self.mitigations = {}
+        self.threat_actors = {}
         self.component_properties_cls = components.ComponentProperties
         self.load_capec_info = load_capec_info
         self.capec_db_path = capec_db_path
@@ -105,6 +109,8 @@ class Ratm:
 
     def Threat(self, *args, **kwargs):
         threat = self.threat_cls(*args, **kwargs)
+        if threat.id in self.threats:
+            raise ValueError(f"A threat with id {threat.id} is already registered")
         self.threats[threat.id] = threat
 
         if self.load_capec_info:
@@ -112,10 +118,30 @@ class Ratm:
 
         return threat
 
+    def Mitigation(self, *args, **kwargs):
+        mitigation = self.mitigation_cls(*args, **kwargs)
+        if mitigation.id in self.mitigations:
+            raise ValueError(
+                f"A mitigation with id {mitigation.id} is already registered"
+            )
+        self.mitigations[mitigation.id] = mitigation
+        return mitigation
+
+    def ThreatActor(self, *args, **kwargs):
+        actor = self.threat_actor_cls(*args, **kwargs)
+        if actor.name in self.threat_actors:
+            raise ValueError(
+                f"A threat actor with name {actor.name} is already registered"
+            )
+        self.threat_actors[actor.name] = actor
+        return actor
+
     def Report(self, scenarios: list[components.Scenario]):
         return report.Report(
             scenarios=scenarios,
             components=self.components.values(),
             threats=self.threats.values(),
             properties=self.properties.values(),
+            mitigations=self.mitigations.values(),
+            threat_actors=self.threat_actors.values(),
         )

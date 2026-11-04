@@ -1,4 +1,7 @@
-from .components import Component, Property, Scenario, Threat
+from collections import Counter
+
+from . import scales
+from .components import Component, Mitigation, Property, Scenario, Threat, ThreatActor
 
 
 class Report:
@@ -8,10 +11,14 @@ class Report:
         components: list[Component] | None = None,
         threats: list[Threat] | None = None,
         properties: list[Property] | None = None,
+        mitigations: list[Mitigation] | None = None,
+        threat_actors: list[ThreatActor] | None = None,
     ):
         self.scenarios = scenarios
-        self.threats = threats
-        self.properties = properties
+        self.threats = list(threats or [])
+        self.properties = list(properties or [])
+        self.mitigations = list(mitigations or [])
+        self.threat_actors = list(threat_actors or [])
         self.components = components or self.populate_components(scenarios)
 
     def populate_components(self, scenarios: list[Scenario]):
@@ -34,7 +41,56 @@ class Report:
     def threats_to_dict(self):
         return [threat.to_dict() for threat in self.threats]
 
+    def mitigations_to_dict(self):
+        return {mit.id: mit.to_dict() for mit in self.mitigations}
+
+    def threat_actors_to_dict(self):
+        return {actor.name: actor.to_dict() for actor in self.threat_actors}
+
+    def validate(self):
+        """Check ids, names, and labels. Raise ValueError on the first problem."""
+        threat_ids = _unique_ids("threat", [t.id for t in self.threats])
+        mitigation_ids = _unique_ids("mitigation", [m.id for m in self.mitigations])
+        actor_names = _unique_ids("threat actor", [a.name for a in self.threat_actors])
+
+        for mit in self.mitigations:
+            if mit.status not in scales.MITIGATION_STATUSES:
+                raise ValueError(
+                    f"Mitigation {mit.id} has unknown status '{mit.status}'"
+                )
+
+        for threat in self.threats:
+            prefix = f"Threat {threat.id}"
+            if threat.status not in scales.THREAT_STATUSES:
+                raise ValueError(f"{prefix} has unknown status '{threat.status}'")
+            _check_in_scale(threat.impact_label, scales.IMPACT_SCORES, prefix, "impact")
+            _check_in_scale(
+                threat.likelihood_label, scales.LIKELIHOOD_SCORES, prefix, "likelihood"
+            )
+            _check_in_scale(
+                threat.residual_impact, scales.IMPACT_SCORES, prefix, "residual impact"
+            )
+            _check_in_scale(
+                threat.residual_likelihood,
+                scales.LIKELIHOOD_SCORES,
+                prefix,
+                "residual likelihood",
+            )
+            for mid in [*threat.mitigations, *threat.further_mitigations]:
+                if mid not in mitigation_ids:
+                    raise ValueError(f"{prefix} refers to unknown mitigation '{mid}'")
+            for name in threat.threat_actors:
+                if name not in actor_names:
+                    raise ValueError(
+                        f"{prefix} refers to unknown threat actor '{name}'"
+                    )
+            for cid in threat.children:
+                if cid == threat.id or cid not in threat_ids:
+                    raise ValueError(f"{prefix} refers to invalid child threat '{cid}'")
+
     def generate(self):
+        self.validate()
+
         for scenario in self.scenarios:
             scenario.populate_findings(self.threats)
 
@@ -43,4 +99,20 @@ class Report:
         report["components"] = self.components_to_dict()
         report["scenarios"] = self.scenarios_to_dict()
         report["threats"] = self.threats_to_dict()
+        report["mitigations"] = self.mitigations_to_dict()
+        report["threat_actors"] = self.threat_actors_to_dict()
         return report
+
+
+def _unique_ids(kind: str, ids: list[str]) -> set[str]:
+    # Name every duplicate at once, so fixing them takes one run, not one per id.
+    duplicates = [item for item, count in Counter(ids).items() if count > 1]
+    if duplicates:
+        names = ", ".join(f"'{item}'" for item in duplicates)
+        raise ValueError(f"Duplicate {kind} ids: {names}")
+    return set(ids)
+
+
+def _check_in_scale(value: str | None, scale: dict, prefix: str, field: str) -> None:
+    if value is not None and value not in scale:
+        raise ValueError(f"{prefix} has unknown {field} '{value}'")

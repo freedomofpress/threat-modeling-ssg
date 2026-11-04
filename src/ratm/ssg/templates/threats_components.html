@@ -2,13 +2,16 @@
 {% set active_page = "threats_components.html" %}
 {% block title %}Threats × Components - Threat Model{% endblock %}
 
-{% macro mitigation_tags(satisfied, missing) %}
-{% if not satisfied and not missing %}
-<span class="cell-tip__none">No mitigation exists for this threat.</span>
+{% import "includes/macros.html" as m %}
+
+{% macro mitigation_tags(mitigations) %}
+{% if not mitigations %}
+<span class="cell-tip__none">No mitigations listed for this threat.</span>
 {% else %}
 <span class="cell-tip__tags">
-    {% for tok in satisfied %}<span class="tag tag--true">{{ tok | display }}</span>{% endfor %}
-    {% for tok in missing %}<span class="tag tag--false">{{ tok | display }}</span>{% endfor %}
+    {% for mit in mitigations %}
+    <span class="tag tag--text">{{ mit.id }}</span>
+    {% endfor %}
 </span>
 {% endif %}
 {% endmacro %}
@@ -17,6 +20,10 @@
 <h1>Threats × Components</h1>
 
 {% if active_threats and sorted_components %}
+<div class="status-legend">
+    A filled cell means the threat applies to that component. Its color shows the threat's status:
+    {% for status in status_legend %}{{ m.status_badge(status) }}{% endfor %}
+</div>
 {% set col_span = active_threats | length + 1 %}
 <div class="prop-table-wrap">
 <table class="prop-table" id="tc-table">
@@ -30,8 +37,8 @@
                 </div>
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
-                    <span class="cell-tip__meta">Severity: {{ threat.severity or "Unknown" }}</span>
-                    {{ mitigation_tags([], threat.mapping.mitigations) }}
+                    <span class="cell-tip__meta">Impact: {{ threat.impact_label }} · Likelihood: {{ threat.likelihood_label }} · Risk: {{ m.risk(threat) }} · Status: {{ threat.status }}</span>
+                    {{ mitigation_tags(model.threat_mitigations(threat)) }}
                 </span>
             </th>
             {% endfor %}
@@ -52,14 +59,13 @@
                 <a href="component_{{ comp_name | slugify }}.html">{{ comp_name }}</a>
             </td>
             {% for tid, threat in active_threats %}
-            {% set cell = status[tid].get(comp_name) %}
-            {% if cell %}
-            <td class="prop-cell {{ 'prop-mit' if cell.mitigated else 'prop-req' }}">
-                {{ '✓' if cell.mitigated else '✗' }}
+            {% if comp_name in applies[tid] %}
+            <td class="prop-cell status--{{ threat.status | status_slug }}">
+                &#x25CF;
                 <span class="cell-tip">
                     <span class="cell-tip__title">{{ tid }} · {{ threat.description }}</span>
-                    <span class="cell-tip__meta">{{ comp_name }} — {{ 'mitigated' if cell.mitigated else 'not mitigated' }}</span>
-                    {{ mitigation_tags(cell.satisfied, cell.missing) }}
+                    <span class="cell-tip__meta">{{ comp_name }} · Status: {{ threat.status }} · Risk: {{ m.risk(threat) }}</span>
+                    {{ mitigation_tags(model.threat_mitigations(threat)) }}
                 </span>
             </td>
             {% else %}

@@ -1,3 +1,4 @@
+{% import "includes/macros.html" as m %}
 {% if scenario.findings %}
 <table>
     <thead>
@@ -5,6 +6,7 @@
             <th>Threat ID</th>
             <th>Description</th>
             <th>Target Component</th>
+            <th>Status</th>
             <th>Mitigations</th>
         </tr>
     </thead>
@@ -15,9 +17,10 @@
             <td><a href="threat_{{ finding.threat_id }}.html">{{ finding.threat_id }}</a></td>
             <td>{{ threat.description }}</td>
             <td><a href="component_{{ finding.target | slugify }}.html">{{ finding.target }}</a></td>
+            <td>{{ m.status_badge(threat.status) }}</td>
             <td>
-                {% for prop in threat.mapping.mitigations %}
-                <span class="tag tag--true">{{ prop | replace('_', ' ') }}</span>
+                {% for mit in model.threat_mitigations(threat) %}
+                <a href="{{ mit.id | mitigation_href }}" class="tag tag--text" title="{{ mit.title }}">{{ mit.id }}</a>
                 {% endfor %}
             </td>
         </tr>
